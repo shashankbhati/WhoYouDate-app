@@ -1,0 +1,253 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo } from "react";
+import { useStore, getUserId } from "@/lib/datedata/store";
+import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
+import { earnedBadges } from "@/lib/datedata/badges";
+import { Calendar, DollarSign, TrendingUp, Heart } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+
+export const Route = createFileRoute("/stats")({
+  head: () => ({
+    meta: [
+      { title: "Your Dashboard — WhoAmIDating" },
+      { name: "description", content: "Your anonymous dating stats: entries, spend, mood, badges, and platform trends." },
+    ],
+  }),
+  component: Stats,
+});
+
+const MOOD_COLORS = ["#ec4899", "#f472b6", "#fb7185", "#fda4af", "#fecdd3"];
+
+function Stats() {
+  const { entries, profile, loading } = useStore();
+  const userId = getUserId();
+  const mine = entries.filter((e) => e.userId === userId);
+
+  const totalSpent = mine.reduce((a, e) => a + e.amountCents, 0);
+  const avg = mine.length ? totalSpent / mine.length : 0;
+  const happyPct = mine.length ? Math.round((mine.filter((e) => e.mood >= 4).length / mine.length) * 100) : 0;
+  const successCount = mine.filter((e) => e.secondDate === "yes" || e.secondDate === "together").length;
+  const successRate = mine.length ? Math.round((successCount / mine.length) * 100) : 0;
+
+  const successByActivity = useMemo(() => {
+    const map: Record<string, { total: number; success: number }> = {};
+    mine.forEach((e) => {
+      if (!map[e.activity]) map[e.activity] = { total: 0, success: 0 };
+      map[e.activity].total++;
+      if (e.secondDate === "yes" || e.secondDate === "together") map[e.activity].success++;
+    });
+    return Object.entries(map)
+      .map(([act, d]) => ({ act: act as Activity, rate: d.total > 0 ? Math.round((d.success / d.total) * 100) : 0, total: d.total }))
+      .sort((a, b) => b.rate - a.rate);
+  }, [mine]);
+
+  const successBySource = useMemo(() => {
+    const map: Record<string, { total: number; success: number }> = {};
+    mine.forEach((e) => {
+      if (!e.meetVia) return;
+      if (!map[e.meetVia]) map[e.meetVia] = { total: 0, success: 0 };
+      map[e.meetVia].total++;
+      if (e.secondDate === "yes" || e.secondDate === "together") map[e.meetVia].success++;
+    });
+    return Object.entries(map)
+      .map(([src, d]) => ({ src, rate: d.total > 0 ? Math.round((d.success / d.total) * 100) : 0, total: d.total }))
+      .sort((a, b) => b.rate - a.rate);
+  }, [mine]);
+
+  const favActivity = useMemo(() => {
+    const c: Record<string, number> = {};
+    mine.forEach((e) => { c[e.activity] = (c[e.activity] ?? 0) + 1; });
+    const top = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+    return top ? ACTIVITY_META[top[0] as Activity] : null;
+  }, [mine]);
+
+  const platform = useMemo(() => {
+    const c: Record<string, number> = {};
+    entries.forEach((e) => { c[e.activity] = (c[e.activity] ?? 0) + 1; });
+    return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ ...ACTIVITY_META[k as Activity], count: v }));
+  }, [entries]);
+  const platformMax = Math.max(1, ...platform.map((p) => p.count));
+
+  const moodDist = useMemo(() => {
+    const c: Record<number, number> = {};
+    mine.forEach((e) => { c[e.mood] = (c[e.mood] ?? 0) + 1; });
+    return Object.entries(c).map(([m, count]) => ({ name: `${MOOD_META[+m as Mood].emoji} ${MOOD_META[+m as Mood].label}`, value: count }));
+  }, [mine]);
+
+  const badges = earnedBadges(mine);
+  const recent = mine.slice(0, 5);
+
+  if (loading) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-8">
+        <div className="h-8 w-48 animate-pulse rounded-lg bg-muted mb-2" />
+        <div className="h-4 w-32 animate-pulse rounded-lg bg-muted mb-8" />
+        <div className="grid sm:grid-cols-2 gap-4">
+          {[...Array(4)].map((_, i) => <div key={i} className="rounded-2xl border border-border bg-card p-5 h-24 animate-pulse" />)}
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-7xl px-4 py-8">
+      <h1 className="text-3xl font-bold">Your Dashboard</h1>
+      <p className="text-muted-foreground mt-1">Hey {profile?.displayName ?? "there"} 👋</p>
+
+      {mine.length === 0 && (
+        <div className="mt-8 rounded-2xl border border-border bg-card p-10 text-center">
+          <p className="text-4xl mb-3">📊</p>
+          <h2 className="font-bold text-lg mb-1">No dates logged yet</h2>
+          <p className="text-muted-foreground text-sm mb-5">Log your first date to see your personal stats, success rate, and badges.</p>
+          <Link to="/log" className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-6 py-2.5 font-semibold text-sm hover:opacity-90">
+            Log Your First Date →
+          </Link>
+        </div>
+      )}
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-6">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <StatCard icon={<Calendar className="h-4 w-4 text-primary" />} label="Total Entries" value={String(mine.length)} />
+            <StatCard icon={<DollarSign className="h-4 w-4 text-primary" />} label="Total Spent" value={`€${(totalSpent / 100).toFixed(0)}`} />
+            <StatCard icon={<TrendingUp className="h-4 w-4 text-amber-400" />} label="Avg per Date" value={`€${(avg / 100).toFixed(0)}`} />
+            <StatCard icon={<Heart className="h-4 w-4 text-emerald-400" />} label="Success Rate" value={mine.length ? `${successRate}%` : "—"} />
+          </div>
+
+          {/* Success formula */}
+          {(successByActivity.length > 0 || successBySource.length > 0) && (
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <h3 className="font-bold mb-1">🎯 Your Success Formula</h3>
+              <p className="text-sm text-muted-foreground mb-4">Based on which dates led to a second date</p>
+              <div className="grid sm:grid-cols-2 gap-6">
+                {successByActivity.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold tracking-wider text-muted-foreground mb-3">BY ACTIVITY</p>
+                    <div className="space-y-2">
+                      {successByActivity.slice(0, 4).map((a) => (
+                        <div key={a.act}>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>{ACTIVITY_META[a.act].emoji} {ACTIVITY_META[a.act].label}</span>
+                            <span className="font-bold" style={{ color: a.rate >= 60 ? "hsl(var(--primary))" : "inherit" }}>{a.rate}%</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${a.rate}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {successBySource.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold tracking-wider text-muted-foreground mb-3">BY SOURCE</p>
+                    <div className="space-y-2">
+                      {successBySource.slice(0, 4).map((s) => (
+                        <div key={s.src}>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="capitalize">{s.src.replace("_", " ")}</span>
+                            <span className="font-bold" style={{ color: s.rate >= 60 ? "hsl(var(--primary))" : "inherit" }}>{s.rate}% <span className="text-muted-foreground font-normal">({s.total})</span></span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${s.rate}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {favActivity && (
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <p className="text-sm text-muted-foreground">Favorite Activity</p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-xl font-bold">{favActivity.emoji} {favActivity.label}</p>
+                <span className="text-3xl">{favActivity.emoji}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <p className="text-sm text-muted-foreground">Badges Earned ({badges.length})</p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {badges.length === 0 && <span className="text-sm text-muted-foreground">Log a date to start earning badges.</span>}
+              {badges.map((b) => (
+                <span key={b.id} className="px-3 py-1.5 rounded-full bg-muted text-sm">{b.emoji} {b.name}</span>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <p className="text-sm text-muted-foreground mb-4">Mood Distribution</p>
+            <div className="h-64">
+              {moodDist.length > 0 ? (
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie data={moodDist} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={2}>
+                      {moodDist.map((_, i) => <Cell key={i} fill={MOOD_COLORS[i % MOOD_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : <p className="text-sm text-muted-foreground text-center py-10">No data yet.</p>}
+            </div>
+          </div>
+        </div>
+
+        <aside className="space-y-4">
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <h3 className="text-xs font-bold tracking-wider mb-3">RECENT DATES</h3>
+            {recent.length === 0 && <p className="text-sm text-muted-foreground">No entries yet.</p>}
+            {recent.map((e) => (
+              <div key={e.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div className="flex items-center gap-2">
+                  <span>{ACTIVITY_META[e.activity].emoji}</span>
+                  <div>
+                    <div className="text-sm font-medium">{e.partnerName} <span className="ml-1">{MOOD_META[e.mood].emoji}</span></div>
+                    <div className="text-xs text-muted-foreground">{relDays(e.createdAt)}</div>
+                  </div>
+                </div>
+                <span className="text-sm font-bold text-primary">€{(e.amountCents / 100).toFixed(0)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <h3 className="text-xs font-bold tracking-wider mb-1">PLATFORM TRENDS</h3>
+            <p className="text-xs text-muted-foreground mb-3">{entries.length} total entries</p>
+            <div className="space-y-3">
+              {platform.slice(0, 5).map((p) => (
+                <div key={p.label} className="flex items-center gap-3">
+                  <span className="text-sm flex-1">{p.emoji} {p.label}</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full bg-primary" style={{ width: `${(p.count / platformMax) * 100}%` }} />
+                  </div>
+                  <span className="text-sm font-bold text-muted-foreground w-10 text-right">{p.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">{icon} {label}</div>
+      <div className="mt-2 text-3xl font-bold">{value}</div>
+    </div>
+  );
+}
+
+function relDays(iso: string) {
+  const h = Math.floor((Date.now() - +new Date(iso)) / 3600000);
+  if (h < 1) return "just now";
+  if (h < 24) return `about ${h} hours ago`;
+  return `${Math.floor(h / 24)} days ago`;
+}
