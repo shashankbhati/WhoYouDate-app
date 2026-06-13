@@ -7,12 +7,16 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Header } from "../components/datedata/Header";
 import { Toaster } from "../components/ui/sonner";
+import { AuthModal } from "../components/auth/AuthModal";
+import { UsernameSetup } from "../components/auth/UsernameSetup";
+import { useAuthState } from "../lib/auth";
+import { useStore } from "../lib/datedata/store";
 
 function NotFoundComponent() {
   return (
@@ -121,6 +125,19 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { isReal, modal } = useAuthState();
+  const { profile, loading: storeLoading } = useStore();
+  const [showUsernameSetup, setShowUsernameSetup] = useState(false);
+
+  // Show username setup once after email is confirmed and no profile exists yet
+  useEffect(() => {
+    if (isReal && !storeLoading && !profile) {
+      setShowUsernameSetup(true);
+    }
+    if (profile) {
+      setShowUsernameSetup(false);
+    }
+  }, [isReal, storeLoading, profile]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -128,6 +145,8 @@ function RootComponent() {
         <Header />
         <Outlet />
         <Toaster />
+        <AuthModal open={modal.open} message={modal.message} />
+        <UsernameSetup open={showUsernameSetup} onDone={() => setShowUsernameSetup(false)} />
       </div>
     </QueryClientProvider>
   );

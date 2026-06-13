@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore, addPost, addComment, voteOnPost, getUserId } from "@/lib/datedata/store";
 import { ACTIVITY_META } from "@/lib/datedata/types";
 import { detectPII } from "@/lib/datedata/pii";
+import { isRealUser, openAuthModal } from "@/lib/auth";
 import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search } from "lucide-react";
 import { toast } from "sonner";
 
@@ -55,7 +56,7 @@ function Skeleton({ className = "" }: { className?: string }) {
 }
 
 function Home() {
-  const { entries, posts, loading } = useStore();
+  const { entries, posts, loading, profile } = useStore();
   const [city, setCity] = useState("Berlin");
   const [partnerMetric, setPartnerMetric] = useState<"cost" | "happy" | "dates">("cost");
   const [tab, setTab] = useState<"feed" | "community" | "hot" | "new" | "top">("hot");
@@ -94,12 +95,16 @@ function Home() {
   }, [entries]);
 
   function submitPost() {
+    if (!isRealUser()) {
+      openAuthModal("Sign in to post and join the community.");
+      return;
+    }
     const content = draft.trim();
     if (!content) return;
     const pii = detectPII(content);
     if (pii) { toast.error(`Looks like you included a ${pii}. Please remove and try again.`); return; }
     if (content.length > 500) { toast.error("Posts max 500 chars."); return; }
-    addPost({ id: Math.random().toString(36).slice(2), author: "you", type: "experience", tags: ["Experience"], content, upvotes: 1, downvotes: 0, comments: [], createdAt: new Date().toISOString() });
+    addPost({ id: Math.random().toString(36).slice(2), author: profile?.displayName ?? "anon", type: "experience", tags: ["Experience"], content, upvotes: 1, downvotes: 0, comments: [], createdAt: new Date().toISOString() });
     setDraft("");
     toast.success("Posted anonymously");
   }
@@ -258,6 +263,11 @@ function Home() {
           )}
 
           <LiveFeed entries={entries} />
+
+          <p className="text-xs text-muted-foreground text-center pb-2">
+            <Link to="/privacy" className="hover:text-foreground transition">Privacy Policy</Link>
+            {" · "}Anonymous by design
+          </p>
         </aside>
       </section>
     </main>
@@ -267,13 +277,18 @@ function Home() {
 function PostCard({ post: p }: { post: ReturnType<typeof useStore>["posts"][0] }) {
   const [expanded, setExpanded] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
+  const { profile } = useStore();
 
   function submitComment() {
+    if (!isRealUser()) {
+      openAuthModal("Sign in to comment.");
+      return;
+    }
     const text = commentDraft.trim();
     if (!text) return;
     const pii = detectPII(text);
     if (pii) { toast.error(`Looks like you included a ${pii}.`); return; }
-    addComment(p.id, text, "you");
+    addComment(p.id, text, profile?.displayName ?? "anon");
     setCommentDraft("");
   }
 

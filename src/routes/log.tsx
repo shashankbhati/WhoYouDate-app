@@ -3,6 +3,7 @@ import { useState } from "react";
 import { addEntry, getUserId, getProfile } from "@/lib/datedata/store";
 import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
 import { detectPII } from "@/lib/datedata/pii";
+import { isRealUser, openAuthModal } from "@/lib/auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/log")({
@@ -44,6 +45,10 @@ function LogDate() {
 
   function submit(ev: React.FormEvent) {
     ev.preventDefault();
+    if (!isRealUser()) {
+      openAuthModal("Sign in to log your dates and track your history.");
+      return;
+    }
     if (!activity) return toast.error("Pick an activity.");
     if (!amount || isNaN(+amount)) return toast.error("Enter an amount.");
     if (!partner.trim()) return toast.error("Add a partner display name.");

@@ -1,6 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Search, Menu, X } from "lucide-react";
+import { Search, Menu, X, LogIn, LogOut } from "lucide-react";
 import { useState } from "react";
+import { useAuthState, openAuthModal, signOut } from "@/lib/auth";
+import { useStore } from "@/lib/datedata/store";
 
 const nav = [
   { to: "/", label: "HOME" },
@@ -11,6 +13,12 @@ const nav = [
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isReal } = useAuthState();
+  const { profile } = useStore();
+
+  function handleSignIn() {
+    openAuthModal("Save your data across devices and join the community.");
+  }
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur">
@@ -36,6 +44,28 @@ export function Header() {
               )}
             </Link>
           ))}
+
+          {isReal ? (
+            <div className="flex items-center gap-2 ml-2 pl-2 border-l border-border">
+              <span className="text-xs font-semibold text-foreground">
+                u/{profile?.displayName ?? "..."}
+              </span>
+              <button
+                onClick={signOut}
+                title="Sign out"
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground transition"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleSignIn}
+              className="ml-2 flex items-center gap-1.5 rounded-full border border-primary text-primary px-3 py-1.5 text-xs font-bold hover:bg-primary/10 transition"
+            >
+              <LogIn className="h-3.5 w-3.5" /> Sign In
+            </button>
+          )}
         </nav>
 
         {/* Mobile: Log CTA + hamburger */}
@@ -61,6 +91,23 @@ export function Header() {
               )}
             </Link>
           ))}
+          <div className="mt-2 pt-2 border-t border-border">
+            {isReal ? (
+              <div className="flex items-center justify-between px-3 py-2">
+                <span className="text-sm font-semibold">u/{profile?.displayName ?? "..."}</span>
+                <button onClick={() => { signOut(); setMobileOpen(false); }} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                  <LogOut className="h-4 w-4" /> Sign out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { handleSignIn(); setMobileOpen(false); }}
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary/10 text-primary px-3 py-2.5 text-sm font-semibold"
+              >
+                <LogIn className="h-4 w-4" /> Sign In
+              </button>
+            )}
+          </div>
         </div>
       )}
     </header>
