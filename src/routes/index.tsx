@@ -6,8 +6,8 @@ import { detectPII } from "@/lib/datedata/pii";
 import { isRealUser, openAuthModal } from "@/lib/auth";
 import { useCountry, setCountry } from "@/lib/country";
 import { COUNTRY_CONFIG, fmtAmount, currencySymbol, type CountryCode } from "@/lib/datedata/countries";
-import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search, Download } from "lucide-react";
-import { downloadShareCard } from "@/lib/shareCard";
+import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search } from "lucide-react";
+import { shareCard } from "@/lib/shareCard";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -202,10 +202,10 @@ function Home() {
             <p className="text-xs text-muted-foreground">Avg {config.currencySymbol}/date. Min 3 entries per name.</p>
             {costliest.length > 0 && (
               <button
-                onClick={() => downloadShareCard(costliest, city, config.currencySymbol)}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition"
+                onClick={() => shareCard(costliest, city, config.currencySymbol)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition"
               >
-                <Download className="h-3.5 w-3.5" /> save as image
+                <Share2 className="h-3.5 w-3.5" /> share
               </button>
             )}
           </div>

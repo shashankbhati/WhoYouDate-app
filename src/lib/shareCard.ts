@@ -1,4 +1,4 @@
-export function downloadShareCard(
+export function shareCard(
   data: { name: string; value: number }[],
   city: string,
   currencySymbol: string,
@@ -116,13 +116,31 @@ export function downloadShareCard(
   ctx.fillText("log your own dates · stay anon", W - 80, H - 76);
   ctx.textAlign = "left";
 
-  // ── Download ──────────────────────────────────────────────────────────────
-  canvas.toBlob((blob) => {
+  // ── Share or download ─────────────────────────────────────────────────────
+  canvas.toBlob(async (blob) => {
     if (!blob) return;
+    const filename = `whoamidating-${city.toLowerCase().replace(/\s+/g, "-")}.png`;
+    const file = new File([blob], filename, { type: "image/png" });
+
+    // Mobile: open native share sheet (WhatsApp, Instagram, Telegram, etc.)
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: `Costliest Dates in ${city}`,
+          text: `who are you even dating in ${city}? 👀 whoamidating.singles`,
+        });
+        return;
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return; // user cancelled — do nothing
+      }
+    }
+
+    // Desktop fallback: download the image
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `whoamidating-${city.toLowerCase().replace(/\s+/g, "-")}.png`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   }, "image/png");
