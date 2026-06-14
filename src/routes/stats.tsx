@@ -3,7 +3,8 @@ import { useMemo } from "react";
 import { useStore, getUserId } from "@/lib/datedata/store";
 import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
 import { earnedBadges } from "@/lib/datedata/badges";
-import { Calendar, DollarSign, TrendingUp, Heart } from "lucide-react";
+import { Calendar, DollarSign, TrendingUp, Heart, Share2 } from "lucide-react";
+import { sharePersonalCard } from "@/lib/shareCard";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 export const Route = createFileRoute("/stats")({
@@ -77,6 +78,27 @@ function Stats() {
   const badges = earnedBadges(mine);
   const recent = mine.slice(0, 5);
 
+  // Detect primary currency from entries
+  const currencyCount: Record<string, number> = {};
+  mine.forEach((e) => { currencyCount[e.currency] = (currencyCount[e.currency] ?? 0) + 1; });
+  const primaryCurrency = Object.entries(currencyCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "EUR";
+  const CURRENCY_SYMBOLS: Record<string, string> = { EUR: "€", USD: "$", INR: "₹", GBP: "£", CHF: "Fr" };
+  const currencySymbol = CURRENCY_SYMBOLS[primaryCurrency] ?? primaryCurrency;
+
+  function handleShare() {
+    sharePersonalCard({
+      username: profile?.displayName ?? "anon",
+      totalDates: mine.length,
+      totalSpent,
+      avgPerDate: avg,
+      currencySymbol,
+      happyRate: happyPct,
+      successRate,
+      avgMood: mine.length ? mine.reduce((a, e) => a + e.mood, 0) / mine.length : 0,
+      favActivity: favActivity ? `${favActivity.emoji} ${favActivity.label}` : "—",
+    });
+  }
+
   if (loading) {
     return (
       <main className="mx-auto max-w-7xl px-4 py-8">
@@ -91,8 +113,20 @@ function Stats() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="text-3xl font-bold">Your Dashboard</h1>
-      <p className="text-muted-foreground mt-1">Hey {profile?.displayName ?? "there"} 👋</p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Your Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Hey {profile?.displayName ?? "there"} 👋</p>
+        </div>
+        {mine.length > 0 && (
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary transition shrink-0"
+          >
+            <Share2 className="h-4 w-4" /> share my stats
+          </button>
+        )}
+      </div>
 
       {mine.length === 0 && (
         <div className="mt-8 rounded-2xl border border-border bg-card p-10 text-center">

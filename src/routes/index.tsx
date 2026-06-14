@@ -7,7 +7,7 @@ import { isRealUser, openAuthModal } from "@/lib/auth";
 import { useCountry, setCountry } from "@/lib/country";
 import { COUNTRY_CONFIG, fmtAmount, currencySymbol, type CountryCode } from "@/lib/datedata/countries";
 import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search } from "lucide-react";
-import { shareCard } from "@/lib/shareCard";
+import { shareCard, shareTrendingCard } from "@/lib/shareCard";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -221,6 +221,14 @@ function Home() {
             </div>
           </div>
           <BarChart data={trendingPartner} />
+          <div className="flex justify-end mt-2">
+            <button
+              onClick={() => shareTrendingCard(trendingPartner, partnerMetric, config.currencySymbol)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition"
+            >
+              <Share2 className="h-3.5 w-3.5" /> share
+            </button>
+          </div>
         </section>
       </div>}
 
