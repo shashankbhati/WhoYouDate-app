@@ -260,52 +260,140 @@ export function seedEntriesUS(): Entry[] {
 export function seedPosts(): Post[] {
   const now = Date.now();
   const t = (d: number) => new Date(now - d * 86400000).toISOString();
-  const comment = (content: string, daysAgo = 2) => ({ id: uid(), author: "anon", content, upvotes: Math.floor(Math.random() * 40) + 1, downvotes: 0, createdAt: t(daysAgo) });
+  const COMMENT_AUTHORS = ["berlindater92", "hingemüde_", "stadtmensch", "kaffeemensch", "swipemüde", "neuköllner_", "app_müde", "bln_single", "prenzlhügel", "friedrianer", "bumbler99", "tinderveteran", "datingstudie", "münchen_exit", "kiezliebe", "delhidater_", "bk_dater", "mchn_alex"];
+  const c = (content: string, daysAgo = 2) => ({ id: uid(), author: rand(COMMENT_AUTHORS), content, upvotes: Math.floor(Math.random() * 55) + 2, downvotes: 0, createdAt: t(daysAgo) });
+
   return [
     {
-      id: uid(), author: "CaféLover", type: "advice", tags: ["Advice", "Coffee"], content: "Pro tip: Coffee dates are underrated. €8 and you actually get to talk, unlike a noisy restaurant. Best dates I've had were over espresso ☕",
-      upvotes: 247, downvotes: 12, comments: [
-        comment("Totally agree. Coffee dates filter out people who aren't really interested in you."),
-        comment("Disagree. Nothing says 'I'm serious' like a proper dinner 🤷", 1),
-        comment("Coffee is 100% the move for first dates. Low pressure, easy to extend or cut short."),
-      ], createdAt: t(3),
+      id: uid(), author: "berlindater92", type: "experience", tags: ["Experience", "Berlin"],
+      content: "alter ich hab gerade €87 für pasta ausgegeben und sie hat danach 2h lang nicht mehr geantwortet. nicht mal ein danke text. ich stehe so dumm da rn 💀",
+      upvotes: 312, downvotes: 14, createdAt: t(2), comments: [
+        c("€87 für pasta?? warst du in mitte oder was 😭", 2),
+        c("been there. das tut weh ngl. ich hoffe wenigstens die pasta war gut", 2),
+        c("nächstes mal kaffee zuerst. €8 risiko statt €87", 1),
+        c("das ghosting danach macht es noch viel schlimmer als wenn sie direkt nein gesagt hätte", 1),
+      ],
     },
     {
-      id: uid(), author: "BerlinDater", type: "experience", tags: ["Experience", "Berlin"], content: "Just had an amazing dinner date in Berlin, but wow, €95 is a lot for pasta! 🍝 Worth it though — the vibe was perfect.",
-      upvotes: 183, downvotes: 8, comments: [
-        comment("€95 for pasta 😭 which restaurant? need to know what to avoid lol"),
-        comment("That's normal for nice places in Mitte tbh. You get what you pay for."),
-      ], createdAt: t(3),
+      id: uid(), author: "kaffeemensch_bln", type: "advice", tags: ["Advice", "Coffee"],
+      content: "hot take: kaffee dates sind die beste erfindung der modernen dating szene. €9, kein awkward schweigen wenn das essen kommt, und wenn es shit ist kannst du nach 30min weg. warum macht das nicht jeder so",
+      upvotes: 428, downvotes: 11, createdAt: t(3), comments: [
+        c("hard agree. hab so viel geld dadurch gespart 😭", 3),
+        c("gegenargument: wenn es gut läuft willst du gar nicht gehen. letzten monat 4h in einem café versessen", 2),
+        c("ja aber dann kannst du trotzdem zum essen verlängern. keine verpflichtung am anfang. das ist der punkt", 2),
+        c("mein letztes date fand kaffee \"nicht richtig genug\" als erstes date... andere zeiten 💀", 1),
+      ],
     },
     {
-      id: uid(), author: "overthinkr99", type: "question", tags: ["Question", "Trip"], content: "Is spending €400 on a weekend trip for an anniversary normal? My friends say I'm overspending but it felt right 🤷",
-      upvotes: 156, downvotes: 34, comments: [
-        comment("Totally normal! Experiences > things every time."),
-        comment("Depends on your income tbh. If it didn't strain you then it's fine."),
-        comment("€400 for a full trip? That's actually pretty reasonable."),
-      ], createdAt: t(5),
+      id: uid(), author: "hingemüde2024", type: "experience", tags: ["Experience", "Hinge"],
+      content: "diesen monat 4 hinge dates gemacht. 3 davon haben einfach aufgehört zu schreiben danach, ohne grund, ohne ankündigung. hab zusammen ca €140 ausgegeben. ich glaub ich brauch eine pause",
+      upvotes: 267, downvotes: 9, createdAt: t(1), comments: [
+        c("das ghosting bei hinge wird echt schlimmer ngl. früher war das anders", 1),
+        c("bumble mal versuchen? da müssen frauen anfangen, irgendwie seriösere leute meiner erfahrung nach", 1),
+        c("€140 in einem monat ist auch nicht wenig alter... ich set mir jetzt ein budget lol", 1),
+      ],
     },
     {
-      id: uid(), author: "observant_dater", type: "observation", tags: ["Observation", "Gift"], content: "Noticed everyone's spending more on gifts lately. Is it just me or has dating become way more expensive in 2026?",
-      upvotes: 312, downvotes: 21, comments: [
-        comment("Inflation hit dating HARD. Even coffee dates feel pricier."),
-        comment("Dating apps also make expectations higher I think.", 1),
-      ], createdAt: t(7),
+      id: uid(), author: "wer_zahlt_wtf", type: "question", tags: ["Question"],
+      content: "echte frage wer zahlt beim ersten date? ich bin ein typ und ich zahle immer aber neulich hat mein date fast drüber gestritten, meinte es sei \"weird und old fashioned\"... bin ich der einzige der das noch so macht",
+      upvotes: 389, downvotes: 41, createdAt: t(5), comments: [
+        c("splitten ist die einzige antwort die 2025 noch sinn ergibt digga", 5),
+        c("ich find es nice wenn einer zahlt aber ich würd mich auch nicht beschweren lol", 4),
+        c("wer vorschlägt zahlt oder beide zahlen gleich. alles andere ist theater", 3),
+        c("ich (w) zahle immer selbst für das erste date. will niemandem was schulden bevor ich die person kenne", 2),
+      ],
     },
     {
-      id: uid(), author: "HingeHopeful", type: "experience", tags: ["Experience", "Coffee", "Hinge"], content: "Met someone on Hinge for coffee, ended up talking for 4 hours. €9 has never felt so worth it 😍 Third date next week!",
-      upvotes: 428, downvotes: 6, comments: [
-        comment("This is the dream 🥹"),
-        comment("Hinge dates hit different fr"),
-        comment("4 hours over coffee? That's a good sign 👌"),
-      ], createdAt: t(2),
+      id: uid(), author: "impulsiv_aber_froh", type: "experience", tags: ["Experience", "Trip"],
+      content: "hab spontan ein wochenende nach amsterdam gebucht mit meinem date, 3. treffen, €280 zusammen für hotel + zug. war das dumm? ja. war es das wert? auch ja. update folgt wenn ich zurück bin",
+      upvotes: 521, downvotes: 8, createdAt: t(4), comments: [
+        c("BRO UPDATE??? ich brauche das für meine seelische gesundheit 😭", 4),
+        c("3. date amsterdam ist entweder die beste oder schlechteste entscheidung, kein mittelweg", 3),
+        c("das ist der move. ich respektiere das sehr", 2),
+        c("wie war esssss", 1),
+      ],
     },
     {
-      id: uid(), author: "MovieNightFan", type: "advice", tags: ["Advice", "Movie"], content: "Movie dates are criminally underrated. €25 for two tickets, shared popcorn, and you have something to talk about after. Perfect formula.",
-      upvotes: 274, downvotes: 18, comments: [
-        comment("The post-movie discussion is literally the best part of the date."),
-        comment("Only works if you actually talk afterwards. Some people just say bye 💀"),
-      ], createdAt: t(4),
+      id: uid(), author: "stadtmensch_BE", type: "observation", tags: ["Observation", "Berlin"],
+      content: "berliner dating preise sind in 2 jahren so krass gestiegen. 2022 waren restaurants in mitte noch okay, jetzt zahlst du €25 für pasta die nix besonderes ist. ich date inzwischen nur noch in friedrichshain oder neukölln",
+      upvotes: 298, downvotes: 16, createdAt: t(7), comments: [
+        c("neukölln is die antwort. bessere vibes, bessere preise, irgendwie auch bessere gespräche", 7),
+        c("prenzlauer berg auch nicht mehr billig lol. kreuzberg geht noch so", 5),
+        c("das liegt auch daran dass überall touristenrestaurants aufgemacht haben in mitte seitdem", 3),
+      ],
+    },
+    {
+      id: uid(), author: "kaffeemensch_bln", type: "experience", tags: ["Experience"],
+      content: "UPDATE: das kaffee date von montag... heute ist unser 3. date und sie wollte nach 2h gar nicht aufhören. ich glaube daran leute 😭",
+      upvotes: 634, downvotes: 3, createdAt: t(0), comments: [
+        c("LETS GOOO ❤️", 0),
+        c("siehste!! kaffee dates sind der weg wenn die chemie stimmt", 0),
+        c("community win 🥹", 0),
+      ],
+    },
+    {
+      id: uid(), author: "kino_lover_bln", type: "advice", tags: ["Advice", "Movie"],
+      content: "kino dates sind so underrated digga. €22 zusammen, ihr müsst nicht die ganze zeit reden, danach habt ihr direkt ein thema. und wenn der film scheiße war habt ihr was gemeinsam worüber ihr lachen könnt",
+      upvotes: 183, downvotes: 22, createdAt: t(6), comments: [
+        c("problem ist man lernt sich beim kino nicht wirklich kennen ngl", 6),
+        c("stimmt aber das ist auch nicht das ziel beim ersten date. vibe check first", 5),
+        c("und gute kinos in berlin haben auch eine bar danach. perfekter abend flow", 3),
+      ],
+    },
+    {
+      id: uid(), author: "münchen_armut", type: "observation", tags: ["Observation"],
+      content: "münchen vs berlin dating mal ehrlich verglichen: gleicher restauranttyp, münchen locker 30% teurer. ich versteh münchen leute nicht wie ihr das schafft. respekt aber auch bitte helft mir",
+      upvotes: 241, downvotes: 5, createdAt: t(8), comments: [
+        c("münchen dater hier. wir schreiben es als investition ab 😭", 8),
+        c("warum glaubt ihr geht münchen in gruppen aus. economy of scale bei split bills lol", 6),
+        c("ich bin aus münchen nach berlin gezogen teilweise wegen dating kosten, nicht mal im spaß", 3),
+      ],
+    },
+    {
+      id: uid(), author: "geschenke_reue", type: "experience", tags: ["Experience", "Gift"],
+      content: "hab in 3 monaten €180 in geschenken für sie ausgegeben. sie hat dann mit jemand anderem angefangen. ich sitz hier und lerne gerade eine lektion die ich mir selbst hätte sparen können 🤡",
+      upvotes: 445, downvotes: 6, createdAt: t(9), comments: [
+        c("geschenke früh in einer beziehung sind immer ein gamble. sorry das ist passiert", 9),
+        c("\"ich lerne eine lektion\" bro du hattest genug für einen roman 💀", 7),
+        c("€180 in 3 monate... alter... ich hoffe es waren wenigstens gute geschenke", 4),
+      ],
+    },
+    {
+      id: uid(), author: "data_dater_", type: "observation", tags: ["Observation"],
+      content: "informelle statistik aus eigenen dates: hinge dates geben am meisten aus (~€65 avg), tinder am wenigsten (~€28), bumble irgendwo dazwischen. macht für mich sinn – die app bestimmt die erwartungen. stimmt das bei euch auch so?",
+      upvotes: 356, downvotes: 12, createdAt: t(3), comments: [
+        c("macht sinn. hinge vermarktet sich als beziehungs-app, andere erwartungen", 3),
+        c("irl begegnungen > alle apps bei mir. die leute sind echter wenn man sich zufällig trifft", 2),
+        c("bumble dates sind bei mir immer die entspanntesten, keine ahnung warum eigentlich", 2),
+      ],
+    },
+    {
+      id: uid(), author: "delhidater_cp", type: "experience", tags: ["Experience"],
+      content: "first date at connaught place, started with coffee ₹480, she suggested dinner after. total ₹2200. best ₹2200 i ever spent ngl, we're meeting again saturday 🙏",
+      upvotes: 167, downvotes: 4, createdAt: t(2), comments: [
+        c("CP first date is always the right call bhai", 2),
+        c("₹2200 total for CP dinner is actually solid value man 👍", 1),
+        c("saturday update mandatory yaar 👀", 1),
+      ],
+    },
+    {
+      id: uid(), author: "bk_dater", type: "observation", tags: ["Observation"],
+      content: "NYC dinner date is $140+ now if you're going anywhere decent. we're all just out here bleeding money to find love lmao. anyway how are we all holding up",
+      upvotes: 289, downvotes: 7, createdAt: t(5), comments: [
+        c("$140 is tuesday in midtown unfortunately 💀", 5),
+        c("brooklyn is still manageable if you know where to go. DM me lmao", 3),
+        c("i have genuinely considered moving cities for cheaper dates at this point", 2),
+      ],
+    },
+    {
+      id: uid(), author: "erstes_date_win", type: "experience", tags: ["Experience", "Coffee"],
+      content: "erstes date heute: kaffee, 45min. dann spaziergehen, 2h. dann spontan essen, €34 zusammen. dann noch ein bier. gesamt 5h, sie hat sich mit \"bis bald\" verabschiedet. ich glaub das ist ein gutes zeichen oder??",
+      upvotes: 478, downvotes: 4, createdAt: t(1), comments: [
+        c("\"bis bald\" ist eindeutig positiv. 5h erstes date ist auch sehr gut 👍", 1),
+        c("alter das klingt perfekt, drück dir die daumen 🤞", 1),
+        c("5h für €34 ist außerdem krasses preis-leistungs-verhältnis lol", 0),
+        c("update bitte wenn das zweite date klappt", 0),
+      ],
     },
   ];
 }

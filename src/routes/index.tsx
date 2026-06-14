@@ -145,7 +145,7 @@ function Home() {
             <div className="h-20 w-20 rounded-full bg-primary grid place-items-center text-2xl font-bold text-primary-foreground ring-4 ring-background">D</div>
             <div className="pb-1">
               <h1 className="text-2xl font-bold">r/WhoAmIDating</h1>
-              <p className="text-sm text-muted-foreground">Anonymous dating analytics</p>
+              <p className="text-sm text-muted-foreground">who are you even spending money on 👀</p>
             </div>
           </div>
           <Link to="/log" className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-5 py-2.5 font-semibold text-sm hover:opacity-90 transition">
@@ -230,7 +230,7 @@ function Home() {
               {/* Composer */}
               <div className="rounded-2xl border border-border bg-card p-3 mb-4 flex items-center gap-3">
                 <div className="h-9 w-9 rounded-full bg-muted grid place-items-center shrink-0">👤</div>
-                <input ref={composerRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitPost()} placeholder="Share your dating experience..." className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none min-w-0" />
+                <input ref={composerRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitPost()} placeholder="was ist auf deinem date passiert... 👀" className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none min-w-0" />
                 <button onClick={submitPost} className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-primary-foreground grid place-items-center transition shrink-0"><Plus className="h-4 w-4" /></button>
               </div>
 
@@ -266,7 +266,7 @@ function Home() {
             <div className="h-16" style={{ background: "var(--gradient-banner)" }} />
             <div className="p-5">
               <h3 className="font-bold">About r/WhoAmIDating</h3>
-              <p className="text-sm text-muted-foreground mt-2">Anonymous, data-driven dating insights. Log your dates, see trends, compare without sharing who you are.</p>
+              <p className="text-sm text-muted-foreground mt-2">track what you spend on dates. see who's trending in your city. stay completely anon — no real names, no data sold.</p>
               <div className="grid grid-cols-2 gap-4 mt-5">
                 <div><div className="text-xl font-bold">{totalEntries}</div><div className="text-xs text-muted-foreground">Dates logged</div></div>
                 <div><div className="text-xl font-bold">{posts.length}</div><div className="text-xs text-muted-foreground">Posts</div></div>
@@ -281,7 +281,7 @@ function Home() {
           <div className="rounded-2xl border border-border bg-card p-5">
             <h3 className="text-xs font-bold tracking-wider mb-3">COMMUNITY RULES</h3>
             <ol className="space-y-2 text-sm">
-              {["No real names or personal info", "Keep it anonymous", "Be respectful and non-judgmental", "Data-backed posts preferred", "No spam or self-promotion"].map((r, i) => (
+              {["keine echten namen. nicknames only.", "what happens here stays here 🤐", "kein talk-shit über dates. be cool.", "zahlen > feelings (aber feelings auch ok)", "kein spam kein selbstpromo danke"].map((r, i) => (
                 <li key={i} className="flex gap-2"><span className="text-muted-foreground font-bold">{i + 1}.</span><span>{r}</span></li>
               ))}
             </ol>
@@ -451,7 +451,7 @@ function NameAnalyticsPanel({ entries, currency, featuredNames }: { entries: Ret
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-card p-4">
         <h2 className="text-xs font-bold tracking-wider mb-1">🔍 NAME ANALYTICS</h2>
-        <p className="text-xs text-muted-foreground mb-3">Search any partner name to see anonymous community data</p>
+        <p className="text-xs text-muted-foreground mb-3">search a name. see what the community says. completely anon.</p>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -483,8 +483,8 @@ function NameAnalyticsPanel({ entries, currency, featuredNames }: { entries: Ret
       {!query && (
         <div className="rounded-2xl border border-border bg-card p-12 text-center">
           <p className="text-3xl mb-3">🔍</p>
-          <p className="font-semibold">Explore name analytics</p>
-          <p className="text-sm text-muted-foreground mt-1">Search above or tap a featured name to see community dating data</p>
+          <p className="font-semibold">search a name above</p>
+          <p className="text-sm text-muted-foreground mt-1">oder tippe einen der namen unten an — was sagt die community?</p>
         </div>
       )}
 
