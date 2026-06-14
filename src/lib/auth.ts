@@ -41,19 +41,24 @@ if (typeof window !== "undefined") {
   });
 }
 
-// Anonymous users: upgrades their account in place, preserving all data (same user_id)
-// No session / new device: sends OTP to create/recover real account
-export async function requestEmailLink(email: string) {
-  if (_user && !_user.email) {
-    const { error } = await supabase.auth.updateUser({ email });
-    if (error) throw error;
-  } else {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true },
-    });
-    if (error) throw error;
-  }
+export async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+    },
+  });
+  if (error) throw error;
+}
+
+export async function signUpWithEmail(email: string, password: string) {
+  const { error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+}
+
+export async function signInWithEmailPassword(email: string, password: string) {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
 }
 
 export async function signOut() {
