@@ -4,6 +4,7 @@ import { addEntry, getUserId, getProfile } from "@/lib/datedata/store";
 import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
 import { detectPII } from "@/lib/datedata/pii";
 import { isRealUser, openAuthModal } from "@/lib/auth";
+import { getCountryConfig } from "@/lib/country";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/log")({
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/log")({
   component: LogDate,
 });
 
-const CURRENCIES = ["EUR", "USD", "GBP", "CHF"];
+const CURRENCIES = ["EUR", "USD", "INR", "GBP", "CHF"];
 const MEET = [
   { id: "bumble", label: "🐝 Bumble" },
   { id: "hinge", label: "⚙️ Hinge" },
@@ -37,7 +38,7 @@ function LogDate() {
   const navigate = useNavigate();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("EUR");
+  const [currency, setCurrency] = useState<string>(() => getCountryConfig().defaultCurrency);
   const [partner, setPartner] = useState("");
   const [meet, setMeet] = useState<string | undefined>();
   const [mood, setMood] = useState<Mood | null>(null);
@@ -66,7 +67,7 @@ function LogDate() {
       mood,
       meetVia: meet,
       secondDate: second,
-      city: profile?.city ?? "Berlin",
+      city: profile?.city ?? getCountryConfig().defaultCity,
       entryDate: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     });

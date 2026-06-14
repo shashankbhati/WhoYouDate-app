@@ -8,6 +8,16 @@ const ACTS: Entry["activity"][] = ["food_date", "movie", "gift", "trip", "coffee
 const MEET_VIA = ["bumble", "hinge", "tinder", "friends", "work_school", "in_person", "other_app"] as const;
 const SECOND_DATE = ["yes", "no", "together"] as const;
 
+const IN_FEMALE = ["Priya", "Neha", "Aditi", "Anjali", "Pooja", "Riya", "Sneha", "Ananya", "Kavya", "Divya", "Ishita", "Simran", "Nisha", "Ayesha", "Sana"];
+const IN_MALE = ["Rahul", "Amit", "Suresh", "Raj", "Dev", "Aarav", "Rohit", "Arjun", "Karan", "Aditya", "Akash", "Varun", "Nikhil", "Siddharth", "Vivek"];
+const IN_NAMES = [...IN_FEMALE, ...IN_MALE];
+const IN_CITIES = ["Delhi", "Mumbai", "Bangalore", "Hyderabad", "Pune", "Chennai"];
+
+const US_FEMALE = ["Ashley", "Jessica", "Emily", "Olivia", "Emma", "Megan", "Sarah", "Chloe", "Madison", "Brittany", "Taylor", "Amanda", "Lauren", "Kayla", "Samantha"];
+const US_MALE = ["Tyler", "Ryan", "Jake", "Brandon", "Chase", "Noah", "Michael", "Chris", "Alex", "Josh", "Kevin", "Matt", "Derek", "Ethan", "Jordan"];
+const US_NAMES = [...US_FEMALE, ...US_MALE];
+const US_CITIES = ["New York", "Los Angeles", "Chicago", "Austin", "Miami"];
+
 // Weighted random to make distributions more realistic
 function weightedRand<T>(items: T[], weights: number[]): T {
   const total = weights.reduce((a, b) => a + b, 0);
@@ -148,6 +158,100 @@ export function seedEntries(): Entry[] {
     const sd = mood >= 4 ? 0.78 : mood === 3 ? 0.5 : 0.18;
     const daysAgo = Math.floor(Math.random() * 120);
     out.push({ id: uid(), userId: "seed_" + uid(), activity, amountCents: amount, currency: "EUR", partnerName: "Johanna", mood, meetVia: weightedRand([...MEET_VIA], [10, 50, 15, 10, 10, 3, 2]), secondDate: (Math.random() < sd ? (mood === 5 && Math.random() < 0.45 ? "together" : "yes") : "no") as Entry["secondDate"], city, entryDate: new Date(now - daysAgo * 86400000).toISOString(), createdAt: new Date(now - daysAgo * 86400000).toISOString() });
+  }
+
+  return out;
+}
+
+export function seedEntriesIndia(): Entry[] {
+  const out: Entry[] = [];
+  const now = Date.now();
+  const CITY_W = [30, 28, 20, 10, 7, 5]; // Delhi > Mumbai > Bangalore > Hyderabad > Pune > Chennai
+  const ACT_W = [28, 15, 12, 6, 30, 9];  // coffee & food dominant
+  const MOOD_W = [12, 20, 28, 25, 15];
+
+  for (let i = 0; i < 500; i++) {
+    const activity = weightedRand(ACTS, ACT_W);
+    const city = weightedRand(IN_CITIES, CITY_W);
+    const base =
+      activity === "trip" ? 500000 :
+      activity === "gift" ? 80000 :
+      activity === "food_date" ? 80000 :
+      activity === "movie" ? 35000 :
+      activity === "coffee" ? 15000 :
+      45000;
+    const amount = Math.max(5000, Math.round(base * (0.5 + Math.random() * 1.5)));
+    const mood = weightedRand([1, 2, 3, 4, 5], MOOD_W) as Entry["mood"];
+    const secondDateProb = mood >= 4 ? 0.62 : mood === 3 ? 0.38 : 0.14;
+    const secondDate: Entry["secondDate"] = Math.random() < secondDateProb ? (mood === 5 && Math.random() < 0.3 ? "together" : "yes") : "no";
+    const daysAgo = Math.floor(Math.random() * 90);
+    out.push({ id: uid(), userId: "seed_" + uid(), activity, amountCents: amount, currency: "INR", partnerName: rand(IN_NAMES), mood, meetVia: rand(MEET_VIA), secondDate, city, entryDate: new Date(now - daysAgo * 86400000).toISOString(), createdAt: new Date(now - daysAgo * 86400000).toISOString() });
+  }
+
+  // Priya — expensive Mumbai foodie (Hinge-heavy, high mood)
+  for (let i = 0; i < 14; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: i % 3 === 0 ? "trip" : "food_date", amountCents: 160000 + Math.floor(Math.random() * 60000), currency: "INR", partnerName: "Priya", mood: 5, meetVia: "hinge", secondDate: "together", city: "Mumbai", entryDate: new Date(now - i * 86400000 * 2).toISOString(), createdAt: new Date(now - i * 86400000 * 2).toISOString() });
+  }
+  // Rahul — Delhi big spender (mix of apps)
+  for (let i = 0; i < 12; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: i % 4 === 0 ? "trip" : "food_date", amountCents: 120000 + Math.floor(Math.random() * 50000), currency: "INR", partnerName: "Rahul", mood: (Math.floor(Math.random() * 2) + 4) as Entry["mood"], meetVia: weightedRand([...MEET_VIA], [20, 30, 25, 10, 5, 5, 5]), secondDate: Math.random() > 0.4 ? "yes" : "no", city: "Delhi", entryDate: new Date(now - i * 86400000 * 3).toISOString(), createdAt: new Date(now - i * 86400000 * 3).toISOString() });
+  }
+  // Anjali — Bangalore gift-giver
+  for (let i = 0; i < 10; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: i % 2 === 0 ? "gift" : "food_date", amountCents: 90000 + Math.floor(Math.random() * 40000), currency: "INR", partnerName: "Anjali", mood: (Math.floor(Math.random() * 2) + 3) as Entry["mood"], meetVia: "bumble", secondDate: "yes", city: "Bangalore", entryDate: new Date(now - i * 86400000 * 2).toISOString(), createdAt: new Date(now - i * 86400000 * 2).toISOString() });
+  }
+  // Ananya — Bangalore coffee dates, high happy rate
+  for (let i = 0; i < 10; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: "coffee", amountCents: 18000 + Math.floor(Math.random() * 8000), currency: "INR", partnerName: "Ananya", mood: 5, meetVia: "hinge", secondDate: "together", city: "Bangalore", entryDate: new Date(now - i * 86400000 * 3).toISOString(), createdAt: new Date(now - i * 86400000 * 3).toISOString() });
+  }
+  // Neha — Mumbai trending
+  for (let i = 0; i < 8; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: rand(["food_date", "movie", "coffee"]), amountCents: 70000 + Math.floor(Math.random() * 30000), currency: "INR", partnerName: "Neha", mood: (Math.floor(Math.random() * 2) + 3) as Entry["mood"], meetVia: "tinder", secondDate: Math.random() > 0.5 ? "yes" : "no", city: "Mumbai", entryDate: new Date(now - i * 86400000 * 2).toISOString(), createdAt: new Date(now - i * 86400000 * 2).toISOString() });
+  }
+
+  return out;
+}
+
+export function seedEntriesUS(): Entry[] {
+  const out: Entry[] = [];
+  const now = Date.now();
+  const CITY_W = [35, 25, 18, 12, 10]; // NY > LA > Chicago > Austin > Miami
+  const ACT_W = [30, 15, 10, 8, 27, 10];
+  const MOOD_W = [10, 18, 28, 28, 16];
+
+  for (let i = 0; i < 400; i++) {
+    const activity = weightedRand(ACTS, ACT_W);
+    const city = weightedRand(US_CITIES, CITY_W);
+    const base =
+      activity === "trip" ? 35000 :
+      activity === "gift" ? 5500 :
+      activity === "food_date" ? 7500 :
+      activity === "movie" ? 3000 :
+      activity === "coffee" ? 850 :
+      4500;
+    const amount = Math.max(200, Math.round(base * (0.5 + Math.random() * 1.5)));
+    const mood = weightedRand([1, 2, 3, 4, 5], MOOD_W) as Entry["mood"];
+    const secondDateProb = mood >= 4 ? 0.63 : mood === 3 ? 0.40 : 0.15;
+    const secondDate: Entry["secondDate"] = Math.random() < secondDateProb ? (mood === 5 && Math.random() < 0.3 ? "together" : "yes") : "no";
+    const daysAgo = Math.floor(Math.random() * 90);
+    out.push({ id: uid(), userId: "seed_" + uid(), activity, amountCents: amount, currency: "USD", partnerName: rand(US_NAMES), mood, meetVia: rand(MEET_VIA), secondDate, city, entryDate: new Date(now - daysAgo * 86400000).toISOString(), createdAt: new Date(now - daysAgo * 86400000).toISOString() });
+  }
+
+  // Ashley — expensive NYC diner
+  for (let i = 0; i < 12; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: i % 3 === 0 ? "trip" : "food_date", amountCents: 14000 + Math.floor(Math.random() * 6000), currency: "USD", partnerName: "Ashley", mood: 5, meetVia: "hinge", secondDate: "together", city: "New York", entryDate: new Date(now - i * 86400000 * 2).toISOString(), createdAt: new Date(now - i * 86400000 * 2).toISOString() });
+  }
+  // Tyler — Austin coffee scene
+  for (let i = 0; i < 10; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: "coffee", amountCents: 1000 + Math.floor(Math.random() * 500), currency: "USD", partnerName: "Tyler", mood: 5, meetVia: "bumble", secondDate: "together", city: "Austin", entryDate: new Date(now - i * 86400000 * 3).toISOString(), createdAt: new Date(now - i * 86400000 * 3).toISOString() });
+  }
+  // Emma — LA trendy
+  for (let i = 0; i < 10; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: i % 2 === 0 ? "food_date" : "gift", amountCents: 9000 + Math.floor(Math.random() * 3000), currency: "USD", partnerName: "Emma", mood: (Math.floor(Math.random() * 2) + 4) as Entry["mood"], meetVia: "tinder", secondDate: "yes", city: "Los Angeles", entryDate: new Date(now - i * 86400000 * 2).toISOString(), createdAt: new Date(now - i * 86400000 * 2).toISOString() });
+  }
+  // Jordan — Chicago mid-range
+  for (let i = 0; i < 8; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: rand(["food_date", "movie"]), amountCents: 6500 + Math.floor(Math.random() * 2000), currency: "USD", partnerName: "Jordan", mood: 4, meetVia: "hinge", secondDate: Math.random() > 0.5 ? "yes" : "no", city: "Chicago", entryDate: new Date(now - i * 86400000 * 3).toISOString(), createdAt: new Date(now - i * 86400000 * 3).toISOString() });
   }
 
   return out;

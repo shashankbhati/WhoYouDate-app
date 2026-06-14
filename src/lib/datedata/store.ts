@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import type { Entry, Post, Profile } from "./types";
-import { seedEntries, seedPosts } from "./seed";
+import { seedEntries, seedEntriesIndia, seedEntriesUS, seedPosts } from "./seed";
 
 // ── Module-level cache (shared across all component instances) ──────────────
 let _entries: Entry[] = [];
@@ -77,13 +77,36 @@ export function getProfile(): Profile | null { return _profile; }
 export function getEntries(): Entry[] { return _entries; }
 export function getPosts(): Post[] { return _posts; }
 
-// ── Seed guard (uses a settings row to avoid duplicate seeding) ───────────────
+// ── Seed guards (settings row per region — UNIQUE constraint blocks race conditions) ──
 async function shouldSeed(): Promise<boolean> {
   const { data } = await supabase.from("settings").select("value").eq("key", "seeded").maybeSingle();
   if (data) return false;
-  // Try to claim the slot — if another client races us, the UNIQUE constraint blocks them
   const { error } = await supabase.from("settings").insert({ key: "seeded", value: "1" });
   return !error;
+}
+
+async function shouldSeedCountry(key: string): Promise<boolean> {
+  const { data } = await supabase.from("settings").select("value").eq("key", key).maybeSingle();
+  if (data) return false;
+  const { error } = await supabase.from("settings").insert({ key, value: "1" });
+  return !error;
+}
+
+function entryToRow(e: Entry) {
+  return {
+    user_id: _userId,
+    activity: e.activity,
+    amount_cents: e.amountCents,
+    currency: e.currency,
+    partner_name: e.partnerName,
+    mood: e.mood,
+    meet_via: e.meetVia ?? null,
+    second_date: e.secondDate ?? null,
+    note: e.note ?? null,
+    city: e.city,
+    entry_date: e.entryDate,
+    created_at: e.createdAt,
+  };
 }
 
 // ── Initialize ───────────────────────────────────────────────────────────────
@@ -101,29 +124,36 @@ async function initialize() {
       .order("created_at", { ascending: false })
       .limit(2000);
 
-    // ── Seed entries if DB is empty ──
+    // ── Seed entries ──
+    let seeded = false;
+
     if (!entryRows || entryRows.length < 50) {
       if (await shouldSeed()) {
         const seeds = seedEntries();
         for (let i = 0; i < seeds.length; i += 100) {
-          await supabase.from("entries").insert(
-            seeds.slice(i, i + 100).map((e) => ({
-              user_id: _userId,
-              activity: e.activity,
-              amount_cents: e.amountCents,
-              currency: e.currency,
-              partner_name: e.partnerName,
-              mood: e.mood,
-              meet_via: e.meetVia ?? null,
-              second_date: e.secondDate ?? null,
-              note: e.note ?? null,
-              city: e.city,
-              entry_date: e.entryDate,
-              created_at: e.createdAt,
-            }))
-          );
+          await supabase.from("entries").insert(seeds.slice(i, i + 100).map(entryToRow));
         }
+        seeded = true;
       }
+    }
+
+    if (await shouldSeedCountry("seeded_india")) {
+      const seeds = seedEntriesIndia();
+      for (let i = 0; i < seeds.length; i += 100) {
+        await supabase.from("entries").insert(seeds.slice(i, i + 100).map(entryToRow));
+      }
+      seeded = true;
+    }
+
+    if (await shouldSeedCountry("seeded_us")) {
+      const seeds = seedEntriesUS();
+      for (let i = 0; i < seeds.length; i += 100) {
+        await supabase.from("entries").insert(seeds.slice(i, i + 100).map(entryToRow));
+      }
+      seeded = true;
+    }
+
+    if (seeded || !entryRows) {
       const { data: fresh } = await supabase.from("entries").select("*").order("created_at", { ascending: false }).limit(2000);
       _entries = (fresh ?? []).map(rowToEntry);
     } else {

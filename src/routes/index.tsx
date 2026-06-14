@@ -4,6 +4,8 @@ import { useStore, addPost, addComment, voteOnPost, getUserId } from "@/lib/date
 import { ACTIVITY_META } from "@/lib/datedata/types";
 import { detectPII } from "@/lib/datedata/pii";
 import { isRealUser, openAuthModal } from "@/lib/auth";
+import { useCountry, setCountry } from "@/lib/country";
+import { COUNTRY_CONFIG, fmtAmount, currencySymbol, type CountryCode } from "@/lib/datedata/countries";
 import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,7 +19,12 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-const CITIES = ["Berlin", "Munich", "Hamburg", "Cologne", "Frankfurt"];
+const FEATURED_NAMES: Record<CountryCode, string[]> = {
+  all: ["Sophie", "Lina", "Thomas", "Anna", "Johanna"],
+  DE: ["Sophie", "Lina", "Thomas", "Anna", "Johanna"],
+  IN: ["Priya", "Rahul", "Anjali", "Ananya", "Neha"],
+  US: ["Ashley", "Tyler", "Emma", "Jordan"],
+};
 
 const BAR_HEIGHT = 120; // px — tall enough to read, compact enough to sit side-by-side
 
@@ -51,24 +58,35 @@ function BarChart({ data, highlightFirst = true }: { data: { name: string; value
 }
 
 // Skeleton pulse block
-function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-muted ${className}`} />;
+function Skeleton({ className = "", style }: { className?: string; style?: React.CSSProperties }) {
+  return <div className={`animate-pulse rounded-lg bg-muted ${className}`} style={style} />;
 }
 
 function Home() {
   const { entries, posts, loading, profile } = useStore();
-  const [city, setCity] = useState("Berlin");
+  const { country, config } = useCountry();
+  const [city, setCity] = useState<string>(config.defaultCity);
   const [partnerMetric, setPartnerMetric] = useState<"cost" | "happy" | "dates">("cost");
   const [tab, setTab] = useState<"feed" | "community" | "hot" | "new" | "top">("hot");
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLInputElement>(null);
 
-  const totalEntries = entries.length;
-  const totalSpent = entries.reduce((a, e) => a + e.amountCents, 0);
-  const avgMood = entries.length ? entries.reduce((a, e) => a + e.mood, 0) / entries.length : 0;
+  // Reset selected city when country changes
+  useEffect(() => { setCity(config.defaultCity); }, [country, config.defaultCity]);
+
+  // Entries filtered to the selected country's cities
+  const displayEntries = useMemo(() =>
+    country === "all" ? entries : entries.filter((e) => (config.cities as readonly string[]).includes(e.city)),
+    [entries, country, config]
+  );
+
+  const totalEntries = displayEntries.length;
+  const totalSpent = displayEntries.reduce((a, e) => a + e.amountCents, 0);
+  const avgMood = displayEntries.length ? displayEntries.reduce((a, e) => a + e.mood, 0) / displayEntries.length : 0;
+  const spentLabel = `${config.currencySymbol}${(totalSpent / 100000).toFixed(1)}K`;
 
   const costliest = useMemo(() => {
-    const inCity = entries.filter((e) => e.city === city);
+    const inCity = displayEntries.filter((e) => e.city === city);
     const byName: Record<string, { sum: number; count: number }> = {};
     inCity.forEach((e) => { (byName[e.partnerName] ??= { sum: 0, count: 0 }); byName[e.partnerName].sum += e.amountCents; byName[e.partnerName].count++; });
     return Object.entries(byName)
@@ -76,23 +94,23 @@ function Home() {
       .map(([name, v]) => ({ name, value: v.sum / v.count }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 6);
-  }, [entries, city]);
+  }, [displayEntries, city]);
 
   const trendingPartner = useMemo(() => {
     const byName: Record<string, { sum: number; happy: number; count: number }> = {};
-    entries.forEach((e) => { (byName[e.partnerName] ??= { sum: 0, happy: 0, count: 0 }); byName[e.partnerName].sum += e.amountCents; if (e.mood >= 4) byName[e.partnerName].happy++; byName[e.partnerName].count++; });
+    displayEntries.forEach((e) => { (byName[e.partnerName] ??= { sum: 0, happy: 0, count: 0 }); byName[e.partnerName].sum += e.amountCents; if (e.mood >= 4) byName[e.partnerName].happy++; byName[e.partnerName].count++; });
     return Object.entries(byName).map(([name, v]) => ({
       name,
       value: partnerMetric === "cost" ? v.sum / v.count : partnerMetric === "happy" ? (v.happy / v.count) * 100 : v.count,
     })).sort((a, b) => b.value - a.value).slice(0, 6);
-  }, [entries, partnerMetric]);
+  }, [displayEntries, partnerMetric]);
 
   const trendingActivity = useMemo(() => {
     const c: Record<string, number> = {};
-    entries.forEach((e) => { c[e.activity] = (c[e.activity] ?? 0) + 1; });
+    displayEntries.forEach((e) => { c[e.activity] = (c[e.activity] ?? 0) + 1; });
     const top = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
     return top ? { ...ACTIVITY_META[top[0] as keyof typeof ACTIVITY_META], count: top[1] } : null;
-  }, [entries]);
+  }, [displayEntries]);
 
   function submitPost() {
     if (!isRealUser()) {
@@ -136,6 +154,20 @@ function Home() {
         </div>
       </section>
 
+      {/* Country selector */}
+      <div className="mt-4 flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-muted-foreground font-medium">🌐 View:</span>
+        {(Object.entries(COUNTRY_CONFIG) as [CountryCode, typeof COUNTRY_CONFIG[CountryCode]][]).map(([code, cfg]) => (
+          <button
+            key={code}
+            onClick={() => setCountry(code)}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition ${country === code ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+          >
+            {cfg.flag} {cfg.label}
+          </button>
+        ))}
+      </div>
+
       {/* Loading skeleton for graphs */}
       {loading && (
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -159,13 +191,13 @@ function Home() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-xs font-bold tracking-wider">💸 COSTLIEST NAMES TO DATE</h2>
             <div className="flex flex-wrap gap-1">
-              {CITIES.map((c) => (
+              {(config.cities as readonly string[]).map((c) => (
                 <button key={c} onClick={() => setCity(c)} className={`px-2 py-0.5 rounded-full text-xs font-medium transition ${city === c ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{c}</button>
               ))}
             </div>
           </div>
           {costliest.length > 0 ? <BarChart data={costliest} /> : <p className="text-sm text-muted-foreground py-6 text-center">Need 3+ entries per name.</p>}
-          <p className="text-xs text-muted-foreground mt-2">Avg €/date. Min 3 entries per name.</p>
+          <p className="text-xs text-muted-foreground mt-2">Avg {config.currencySymbol}/date. Min 3 entries per name.</p>
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-4">
@@ -192,7 +224,7 @@ function Home() {
           </div>
 
           {tab === "community" ? (
-            <NameAnalyticsPanel entries={entries} />
+            <NameAnalyticsPanel entries={displayEntries} currency={config.defaultCurrency} featuredNames={FEATURED_NAMES[country]} />
           ) : (
             <>
               {/* Composer */}
@@ -238,7 +270,7 @@ function Home() {
               <div className="grid grid-cols-2 gap-4 mt-5">
                 <div><div className="text-xl font-bold">{totalEntries}</div><div className="text-xs text-muted-foreground">Dates logged</div></div>
                 <div><div className="text-xl font-bold">{posts.length}</div><div className="text-xs text-muted-foreground">Posts</div></div>
-                <div><div className="text-xl font-bold">€{(totalSpent / 100000).toFixed(1)}K</div><div className="text-xs text-muted-foreground">Total spent</div></div>
+                <div><div className="text-xl font-bold">{spentLabel}</div><div className="text-xs text-muted-foreground">Total spent</div></div>
                 <div><div className="text-xl font-bold">{avgMood.toFixed(1)} / 5</div><div className="text-xs text-muted-foreground">Avg mood</div></div>
               </div>
               <Link to="/log" className="mt-5 block text-center rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-semibold hover:opacity-90">Log a Date</Link>
@@ -262,7 +294,7 @@ function Home() {
             </div>
           )}
 
-          <LiveFeed entries={entries} />
+          <LiveFeed entries={displayEntries} />
 
           <p className="text-xs text-muted-foreground text-center pb-2">
             <Link to="/privacy" className="hover:text-foreground transition">Privacy Policy</Link>
@@ -377,9 +409,7 @@ const MEET_LABELS: Record<string, string> = {
   work_school: "Work/School", in_person: "IRL", other_app: "Other App",
 };
 
-const FEATURED_NAMES = ["Sophie", "Lina", "Thomas", "Anna", "Johanna"];
-
-function NameAnalyticsPanel({ entries }: { entries: ReturnType<typeof useStore>["entries"] }) {
+function NameAnalyticsPanel({ entries, currency, featuredNames }: { entries: ReturnType<typeof useStore>["entries"]; currency: string; featuredNames: string[] }) {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
 
@@ -438,7 +468,7 @@ function NameAnalyticsPanel({ entries }: { entries: ReturnType<typeof useStore>[
           </button>
         </div>
         <div className="flex flex-wrap gap-2 mt-3">
-          {FEATURED_NAMES.map((n) => (
+          {featuredNames.map((n) => (
             <button
               key={n}
               onClick={() => search(n)}
@@ -474,7 +504,7 @@ function NameAnalyticsPanel({ entries }: { entries: ReturnType<typeof useStore>[
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard label="Avg €/date" value={`€${(analytics.avgSpend / 100).toFixed(0)}`} />
+            <StatCard label={`Avg ${currencySymbol(currency)}/date`} value={fmtAmount(analytics.avgSpend, currency)} />
             <StatCard label="Happy rate" value={`${(analytics.happyRate * 100).toFixed(0)}%`} sub="mood 4 or 5" />
             <StatCard label="2nd date rate" value={`${(analytics.secondDateRate * 100).toFixed(0)}%`} />
             <StatCard label="Avg mood" value={`${analytics.avgMood.toFixed(1)} / 5`} />
@@ -547,7 +577,7 @@ function LiveFeed({ entries }: { entries: ReturnType<typeof useStore>["entries"]
           return (
             <div key={e.id + i} className="flex items-center gap-2 text-sm">
               <span>{meta.emoji}</span>
-              <span className="font-medium text-primary">€{(e.amountCents / 100).toFixed(0)}</span>
+              <span className="font-medium text-primary">{fmtAmount(e.amountCents, e.currency)}</span>
               <span className="text-muted-foreground flex-1 truncate">{meta.label} in {e.city}</span>
               <span className="text-xs text-muted-foreground shrink-0">{display}</span>
             </div>
