@@ -6,7 +6,8 @@ import { detectPII } from "@/lib/datedata/pii";
 import { isRealUser, openAuthModal } from "@/lib/auth";
 import { useCountry, setCountry } from "@/lib/country";
 import { COUNTRY_CONFIG, fmtAmount, currencySymbol, type CountryCode } from "@/lib/datedata/countries";
-import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search } from "lucide-react";
+import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search, Download } from "lucide-react";
+import { downloadShareCard } from "@/lib/shareCard";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -197,7 +198,17 @@ function Home() {
             </div>
           </div>
           {costliest.length > 0 ? <BarChart data={costliest} /> : <p className="text-sm text-muted-foreground py-6 text-center">Need 3+ entries per name.</p>}
-          <p className="text-xs text-muted-foreground mt-2">Avg {config.currencySymbol}/date. Min 3 entries per name.</p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-muted-foreground">Avg {config.currencySymbol}/date. Min 3 entries per name.</p>
+            {costliest.length > 0 && (
+              <button
+                onClick={() => downloadShareCard(costliest, city, config.currencySymbol)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition"
+              >
+                <Download className="h-3.5 w-3.5" /> save as image
+              </button>
+            )}
+          </div>
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-4">
