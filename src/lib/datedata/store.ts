@@ -169,8 +169,13 @@ async function initialize() {
       .order("created_at", { ascending: false })
       .limit(100);
 
-    if (!postRows || postRows.length === 0) {
-      for (const p of seedPosts()) {
+    const seeds = seedPosts();
+    const needsMorePosts = !postRows || postRows.length < seeds.length;
+    const existingContents = new Set((postRows ?? []).map((r) => r.content as string));
+
+    if (needsMorePosts) {
+      for (const p of seeds) {
+        if (existingContents.has(p.content)) continue; // skip already-seeded posts
         const { data: inserted } = await supabase
           .from("posts")
           .insert({ user_id: _userId, author: p.author, type: p.type, content: p.content, tags: p.tags, upvotes: p.upvotes, downvotes: p.downvotes, created_at: p.createdAt })
@@ -310,6 +315,14 @@ export async function editComment(postId: string, commentId: string, content: st
 export async function saveProfile(p: Profile) {
   if (typeof window === "undefined") return;
   await ensureAuth();
+  // Uniqueness check — reject if another user already has this display name
+  const { data: taken } = await supabase
+    .from("profiles")
+    .select("user_id")
+    .eq("display_name", p.displayName)
+    .neq("user_id", _userId)
+    .maybeSingle();
+  if (taken) throw new Error("Username already taken");
   await supabase.from("profiles").upsert(
     { user_id: _userId, display_name: p.displayName, partner_display_name: p.partnerDisplayName ?? null, age_range: p.ageRange, city: p.city, country: p.country, relationship_stage: p.relationshipStage },
     { onConflict: "user_id" }
@@ -328,6 +341,23 @@ export function useStore() {
     return () => { listeners.delete(listener); };
   }, []);
   return { entries: _entries, posts: _posts, profile: _profile, userId: _userId, loading: !_initialized };
+}
+
+// ── Auth state change — reset store when user switches accounts ───────────────
+if (typeof window !== "undefined") {
+  supabase.auth.onAuthStateChange((_event, session) => {
+    const incomingId = session?.user?.id ?? "";
+    if (incomingId !== _userId && _initialized) {
+      _entries = [];
+      _posts = [];
+      _profile = null;
+      _userId = incomingId;
+      _initialized = false;
+      _initializing = false;
+      if (incomingId) initialize();
+      else emit();
+    }
+  });
 }
 
 // Legacy compat

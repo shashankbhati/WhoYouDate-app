@@ -24,6 +24,7 @@ const nav = [
   { to: "/stats", label: "STATS" },
   { to: "/log", label: "LOG" },
   { to: "/profile", label: "PROFILE" },
+  { to: "/settings", label: "SETTINGS" },
 ] as const;
 
 export function Header() {

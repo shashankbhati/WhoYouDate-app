@@ -68,7 +68,7 @@ function Home() {
   const { country, config } = useCountry();
   const [city, setCity] = useState<string>(config.defaultCity);
   const [partnerMetric, setPartnerMetric] = useState<"cost" | "happy" | "dates">("cost");
-  const [tab, setTab] = useState<"feed" | "community" | "hot" | "new" | "top">("hot");
+  const [tab, setTab] = useState<"feed" | "lookup" | "hot" | "new" | "top">("hot");
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLInputElement>(null);
 
@@ -237,20 +237,30 @@ function Home() {
         <div>
           {/* Tabs */}
           <div className="flex flex-wrap items-center gap-1 rounded-2xl border border-border bg-card p-2 mb-4">
-            {[["feed", "🗂️ Feed"], ["community", "💬 Community"], ["hot", "🔥 Hot"], ["new", "✨ New"], ["top", "📈 Top"]].map(([k, l]) => (
+            {[["feed", "🗂️ Feed"], ["lookup", "🔍 Name Lookup"], ["hot", "🔥 Hot"], ["new", "✨ New"], ["top", "📈 Top"]].map(([k, l]) => (
               <button key={k} onClick={() => setTab(k as typeof tab)} className={`px-4 py-2 rounded-md text-sm font-medium transition ${tab === k ? (k === "hot" ? "bg-primary/20 text-primary" : "bg-muted text-foreground") : "text-muted-foreground hover:text-foreground"}`}>{l}</button>
             ))}
           </div>
 
-          {tab === "community" ? (
-            <NameAnalyticsPanel entries={displayEntries} currency={config.defaultCurrency} featuredNames={FEATURED_NAMES[country]} />
+          {tab === "lookup" ? (
+            <div className="space-y-4">
+              <NameAnalyticsPanel entries={displayEntries} currency={config.defaultCurrency} featuredNames={FEATURED_NAMES[country]} />
+              <CityComparisonPanel entries={displayEntries} config={config} />
+            </div>
           ) : (
             <>
               {/* Composer */}
-              <div className="rounded-2xl border border-border bg-card p-3 mb-4 flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-muted grid place-items-center shrink-0">👤</div>
-                <input ref={composerRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitPost()} placeholder="was ist auf deinem date passiert... 👀" className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none min-w-0" />
-                <button onClick={submitPost} className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-primary-foreground grid place-items-center transition shrink-0"><Plus className="h-4 w-4" /></button>
+              <div className="rounded-2xl border border-border bg-card p-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-muted grid place-items-center shrink-0">👤</div>
+                  <input ref={composerRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitPost()} placeholder="was ist auf deinem date passiert... 👀" className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none min-w-0" />
+                  <button onClick={submitPost} className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-primary-foreground grid place-items-center transition shrink-0"><Plus className="h-4 w-4" /></button>
+                </div>
+                <div className="flex gap-1 mt-2 pl-12 flex-wrap">
+                  {["💸", "😭", "💀", "🤡", "😅", "👀", "🔥", "💕", "😍", "🙏", "💔", "🤣"].map((e) => (
+                    <button key={e} onClick={() => setDraft((d) => d + e)} className="text-base hover:scale-125 transition-transform leading-none">{e}</button>
+                  ))}
+                </div>
               </div>
 
               {/* Posts */}
@@ -286,7 +296,8 @@ function Home() {
             <div className="p-5">
               <h3 className="font-bold">About r/WhoAmIDating</h3>
               <p className="text-sm text-muted-foreground mt-2">track what you spend on dates. see who's trending in your city. stay completely anon — no real names, no data sold.</p>
-              <div className="grid grid-cols-2 gap-4 mt-5">
+              <p className="text-xs text-muted-foreground/60 mt-3 mb-1">Community totals</p>
+              <div className="grid grid-cols-2 gap-4">
                 <div><div className="text-xl font-bold">{totalEntries}</div><div className="text-xs text-muted-foreground">Dates logged</div></div>
                 <div><div className="text-xl font-bold">{posts.length}</div><div className="text-xs text-muted-foreground">Posts</div></div>
                 <div><div className="text-xl font-bold">{spentLabel}</div><div className="text-xs text-muted-foreground">Total spent</div></div>
@@ -706,6 +717,50 @@ function NameAnalyticsPanel({ entries, currency, featuredNames }: { entries: Ret
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function CityComparisonPanel({ entries, config }: { entries: ReturnType<typeof useStore>["entries"]; config: ReturnType<typeof useCountry>["config"] }) {
+  const cities = useMemo(() => {
+    const map: Record<string, { count: number; total: number; happy: number }> = {};
+    entries.forEach((e) => {
+      (map[e.city] ??= { count: 0, total: 0, happy: 0 });
+      map[e.city].count++;
+      map[e.city].total += e.amountCents;
+      if (e.mood >= 4) map[e.city].happy++;
+    });
+    return Object.entries(map)
+      .filter(([, v]) => v.count >= 5)
+      .map(([city, v]) => ({ city, avg: Math.round(v.total / v.count / 100), happy: Math.round((v.happy / v.count) * 100), count: v.count }))
+      .sort((a, b) => b.avg - a.avg)
+      .slice(0, 6);
+  }, [entries]);
+
+  if (cities.length < 2) return null;
+
+  const maxAvg = Math.max(...cities.map((c) => c.avg));
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <h2 className="text-xs font-bold tracking-wider mb-4">🏙️ CITY BATTLE — AVG SPEND PER DATE</h2>
+      <div className="space-y-3">
+        {cities.map((c) => (
+          <div key={c.city}>
+            <div className="flex items-center justify-between text-sm mb-1">
+              <span className="font-medium">{c.city}</span>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="text-foreground font-bold">{config.currencySymbol}{c.avg}</span>
+                <span>😊 {c.happy}%</span>
+                <span>{c.count} dates</span>
+              </div>
+            </div>
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <div className="h-full bg-primary rounded-full" style={{ width: `${Math.round((c.avg / maxAvg) * 100)}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

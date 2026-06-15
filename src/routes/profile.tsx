@@ -1,9 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useStore, saveProfile, getUserId } from "@/lib/datedata/store";
 import { ACTIVITY_META, type AgeRange, type Profile } from "@/lib/datedata/types";
 import { BADGES, earnedBadges } from "@/lib/datedata/badges";
-import { Settings, Share2, Check } from "lucide-react";
+import { Settings, Share2, Check, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/profile")({
@@ -48,9 +48,15 @@ function ProfilePage() {
   const happyPct = mine.length ? Math.round((mine.filter((e) => e.mood >= 4).length / mine.length) * 100) : 0;
   const recent = mine.slice(0, 3);
 
-  function save() {
-    saveProfile(draft);
-    setEditing(false);
+  async function save() {
+    try {
+      await saveProfile(draft);
+      setEditing(false);
+      toast.success("Profile saved!");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save.";
+      toast.error(msg.includes("taken") ? "That username is already taken." : msg);
+    }
   }
 
   return (
@@ -131,9 +137,14 @@ function ProfilePage() {
                 <Share2 className="h-4 w-4" /> Share Stats
               </button>
             </div>
-            <button onClick={() => editing ? save() : setEditing(true)} className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-muted hover:bg-muted/80 py-3 text-sm font-medium">
-              <Settings className="h-4 w-4" /> {editing ? "Save Profile" : "Edit Profile"}
-            </button>
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => editing ? save() : setEditing(true)} className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-muted hover:bg-muted/80 py-3 text-sm font-medium">
+                <Settings className="h-4 w-4" /> {editing ? "Save Profile" : "Edit Profile"}
+              </button>
+              <Link to="/settings" className="inline-flex items-center justify-center gap-2 rounded-xl border border-border hover:bg-muted px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition">
+                <ExternalLink className="h-4 w-4" /> Account
+              </Link>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-6">
