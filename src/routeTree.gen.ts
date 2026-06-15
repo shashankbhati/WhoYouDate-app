@@ -77,7 +77,14 @@ export interface FileRouteTypes {
   fullPaths: '/' | '/log' | '/privacy' | '/profile' | '/sitemap.xml' | '/stats'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/log' | '/privacy' | '/profile' | '/sitemap.xml' | '/stats'
-  id: '__root__' | '/' | '/log' | '/privacy' | '/profile' | '/sitemap.xml' | '/stats'
+  id:
+    | '__root__'
+    | '/'
+    | '/log'
+    | '/privacy'
+    | '/profile'
+    | '/sitemap.xml'
+    | '/stats'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
