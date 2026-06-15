@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useStore, addPost, addComment, voteOnPost, getUserId } from "@/lib/datedata/store";
+import { useStore, addPost, addComment, voteOnPost, getUserId, deletePost, deleteComment, editPost, editComment } from "@/lib/datedata/store";
 import { ACTIVITY_META } from "@/lib/datedata/types";
 import { detectPII } from "@/lib/datedata/pii";
 import { isRealUser, openAuthModal } from "@/lib/auth";
 import { useCountry, setCountry } from "@/lib/country";
 import { COUNTRY_CONFIG, fmtAmount, currencySymbol, type CountryCode } from "@/lib/datedata/countries";
-import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search } from "lucide-react";
+import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react";
 import { shareCard, shareTrendingCard } from "@/lib/shareCard";
 import { toast } from "sonner";
 
@@ -328,7 +328,12 @@ function Home() {
 function PostCard({ post: p }: { post: ReturnType<typeof useStore>["posts"][0] }) {
   const [expanded, setExpanded] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState(p.content);
   const { profile } = useStore();
+  const myId = typeof window !== "undefined" ? getUserId() : "";
+  const isOwn = !!myId && p.userId === myId;
 
   function submitComment() {
     if (!isRealUser()) {
@@ -348,6 +353,20 @@ function PostCard({ post: p }: { post: ReturnType<typeof useStore>["posts"][0] }
     toast.success("Link copied!");
   };
 
+  async function handleSaveEdit() {
+    const content = editDraft.trim();
+    if (!content || content === p.content) { setEditing(false); return; }
+    if (content.length > 500) { toast.error("Max 500 chars."); return; }
+    await editPost(p.id, content);
+    setEditing(false);
+  }
+
+  async function handleDelete() {
+    setMenuOpen(false);
+    await deletePost(p.id);
+    toast.success("Post removed.");
+  }
+
   return (
     <article className="rounded-2xl border border-border bg-card p-4">
       <div className="flex gap-3">
@@ -362,8 +381,54 @@ function PostCard({ post: p }: { post: ReturnType<typeof useStore>["posts"][0] }
             <span>·</span>
             <span>{relTime(p.createdAt)}</span>
             {p.tags[0] && <><span>·</span><span className="px-2 py-0.5 rounded-full bg-muted text-foreground">{p.tags[0]}</span></>}
+            {isOwn && (
+              <div className="relative ml-auto">
+                <button onClick={() => setMenuOpen(!menuOpen)} className="p-1 rounded hover:bg-muted transition">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 top-6 z-10 w-28 rounded-xl border border-border bg-card shadow-lg py-1">
+                    <button
+                      onClick={() => { setEditing(true); setEditDraft(p.content); setMenuOpen(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted transition"
+                    >
+                      <Pencil className="h-3 w-3" /> Edit
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-destructive hover:bg-muted transition"
+                    >
+                      <Trash2 className="h-3 w-3" /> Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <p className="text-sm leading-relaxed">{p.content}</p>
+
+          {editing ? (
+            <div className="space-y-2">
+              <textarea
+                value={editDraft}
+                onChange={(e) => setEditDraft(e.target.value)}
+                className="w-full rounded-xl bg-input border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 resize-none"
+                rows={3}
+                maxLength={500}
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button onClick={handleSaveEdit} className="flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold hover:opacity-90">
+                  <Check className="h-3 w-3" /> Save
+                </button>
+                <button onClick={() => setEditing(false)} className="flex items-center gap-1 rounded-full bg-muted text-muted-foreground px-3 py-1 text-xs hover:text-foreground">
+                  <X className="h-3 w-3" /> Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm leading-relaxed">{p.content}</p>
+          )}
+
           <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
             <button onClick={() => setExpanded(!expanded)} className="inline-flex items-center gap-1 hover:text-foreground">
               <MessageSquare className="h-3.5 w-3.5" /> {p.comments.length} comment{p.comments.length !== 1 ? "s" : ""}
@@ -374,14 +439,7 @@ function PostCard({ post: p }: { post: ReturnType<typeof useStore>["posts"][0] }
           {expanded && (
             <div className="mt-3 pt-3 border-t border-border space-y-3">
               {p.comments.map((c) => (
-                <div key={c.id} className="flex gap-2 text-xs">
-                  <div className="h-6 w-6 rounded-full bg-muted grid place-items-center shrink-0 text-[10px]">u</div>
-                  <div>
-                    <span className="font-semibold text-foreground">u/{c.author}</span>
-                    <span className="text-muted-foreground ml-2">{relTime(c.createdAt)}</span>
-                    <p className="text-sm text-foreground mt-0.5">{c.content}</p>
-                  </div>
-                </div>
+                <CommentRow key={c.id} postId={p.id} comment={c} myId={myId} />
               ))}
               {p.comments.length === 0 && <p className="text-xs text-muted-foreground">No comments yet — be first!</p>}
               <div className="flex gap-2 mt-2">
@@ -402,6 +460,82 @@ function PostCard({ post: p }: { post: ReturnType<typeof useStore>["posts"][0] }
         </div>
       </div>
     </article>
+  );
+}
+
+function CommentRow({ postId, comment: c, myId }: { postId: string; comment: ReturnType<typeof useStore>["posts"][0]["comments"][0]; myId: string }) {
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState(c.content);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const isOwn = !!myId && c.userId === myId;
+
+  async function handleSave() {
+    const content = editDraft.trim();
+    if (!content || content === c.content) { setEditing(false); return; }
+    await editComment(postId, c.id, content);
+    setEditing(false);
+  }
+
+  async function handleDelete() {
+    setMenuOpen(false);
+    await deleteComment(postId, c.id);
+  }
+
+  return (
+    <div className="flex gap-2 text-xs">
+      <div className="h-6 w-6 rounded-full bg-muted grid place-items-center shrink-0 text-[10px]">u</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          <span className="font-semibold text-foreground">u/{c.author}</span>
+          <span className="text-muted-foreground ml-1">{relTime(c.createdAt)}</span>
+          {isOwn && (
+            <div className="relative ml-auto">
+              <button onClick={() => setMenuOpen(!menuOpen)} className="p-0.5 rounded hover:bg-muted transition">
+                <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-5 z-10 w-24 rounded-xl border border-border bg-card shadow-lg py-1">
+                  <button
+                    onClick={() => { setEditing(true); setEditDraft(c.content); setMenuOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted transition"
+                  >
+                    <Pencil className="h-3 w-3" /> Edit
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-destructive hover:bg-muted transition"
+                  >
+                    <Trash2 className="h-3 w-3" /> Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {editing ? (
+          <div className="mt-1 space-y-1">
+            <input
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              className="w-full rounded-lg bg-input border border-border px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-ring/40"
+              maxLength={300}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") setEditing(false); }}
+            />
+            <div className="flex gap-1">
+              <button onClick={handleSave} className="flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-semibold hover:opacity-90">
+                <Check className="h-2.5 w-2.5" /> Save
+              </button>
+              <button onClick={() => setEditing(false)} className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">
+                <X className="h-2.5 w-2.5" /> Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-foreground mt-0.5">{c.content}</p>
+        )}
+      </div>
+    </div>
   );
 }
 

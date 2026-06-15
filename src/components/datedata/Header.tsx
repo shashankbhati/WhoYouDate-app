@@ -1,8 +1,23 @@
 import { Link } from "@tanstack/react-router";
-import { Search, Menu, X, LogIn, LogOut } from "lucide-react";
-import { useState } from "react";
+import { Search, Menu, X, LogIn, LogOut, Bell } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthState, openAuthModal, signOut } from "@/lib/auth";
-import { useStore } from "@/lib/datedata/store";
+import { useStore, getUserId } from "@/lib/datedata/store";
+
+const NOTIF_TS_KEY = "wad_notif_ts";
+
+function getLastSeen(): number {
+  if (typeof window === "undefined") return Date.now();
+  const v = localStorage.getItem(NOTIF_TS_KEY);
+  if (v) return parseInt(v);
+  const now = Date.now();
+  localStorage.setItem(NOTIF_TS_KEY, now.toString());
+  return now;
+}
+
+function markSeen() {
+  if (typeof window !== "undefined") localStorage.setItem(NOTIF_TS_KEY, Date.now().toString());
+}
 
 const nav = [
   { to: "/", label: "HOME" },
@@ -13,8 +28,35 @@ const nav = [
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
   const { isReal } = useAuthState();
-  const { profile } = useStore();
+  const { profile, posts } = useStore();
+
+  const myId = typeof window !== "undefined" ? getUserId() : "";
+  const [lastSeen, setLastSeen] = useState(() => getLastSeen());
+
+  const newNotifs = posts
+    .filter((p) => p.userId === myId)
+    .flatMap((p) =>
+      p.comments
+        .filter((c) => c.userId !== myId && +new Date(c.createdAt) > lastSeen)
+        .map((c) => ({ postId: p.id, postSnippet: p.content.slice(0, 60), comment: c, postAuthor: p.author }))
+    );
+
+  function openNotifs() {
+    setNotifOpen(true);
+    markSeen();
+    setLastSeen(Date.now());
+  }
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
   function handleSignIn() {
     openAuthModal("Save your data across devices and join the community.");
@@ -44,6 +86,45 @@ export function Header() {
               )}
             </Link>
           ))}
+
+          {/* Notification bell */}
+          {myId && (
+            <div ref={notifRef} className="relative ml-1">
+              <button
+                onClick={openNotifs}
+                className="relative p-1.5 rounded-md text-muted-foreground hover:text-foreground transition"
+                title="Notifications"
+              >
+                <Bell className="h-4 w-4" />
+                {newNotifs.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold grid place-items-center">
+                    {newNotifs.length > 9 ? "9+" : newNotifs.length}
+                  </span>
+                )}
+              </button>
+              {notifOpen && (
+                <div className="absolute right-0 top-9 z-50 w-72 rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                    <span className="text-sm font-bold">Notifications</span>
+                    <span className="text-xs text-muted-foreground">{newNotifs.length} new</span>
+                  </div>
+                  {newNotifs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-6">No new replies yet.</p>
+                  ) : (
+                    <ul className="max-h-64 overflow-y-auto divide-y divide-border">
+                      {newNotifs.map((n, i) => (
+                        <li key={i} className="px-4 py-3 hover:bg-muted transition cursor-pointer" onClick={() => setNotifOpen(false)}>
+                          <p className="text-xs font-semibold text-foreground">u/{n.comment.author} replied</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">"{n.comment.content}"</p>
+                          <p className="text-[10px] text-muted-foreground/60 mt-1">on: {n.postSnippet}{n.postSnippet.length >= 60 ? "…" : ""}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {isReal ? (
             <div className="flex items-center gap-2 ml-2 pl-2 border-l border-border">

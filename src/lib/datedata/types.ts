@@ -31,6 +31,7 @@ export interface Profile {
 
 export interface Post {
   id: string;
+  userId?: string;
   author: string;
   type: "experience" | "advice" | "story" | "question" | "observation";
   content: string;
@@ -43,6 +44,7 @@ export interface Post {
 
 export interface Comment {
   id: string;
+  userId?: string;
   author: string;
   content: string;
   upvotes: number;

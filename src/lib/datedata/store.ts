@@ -39,6 +39,7 @@ function rowToEntry(r: any): Entry {
 function rowToPost(r: any): Post {
   return {
     id: r.id,
+    userId: r.user_id,
     author: r.author,
     type: r.type,
     content: r.content,
@@ -48,6 +49,7 @@ function rowToPost(r: any): Post {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     comments: (r.comments ?? []).map((c: any) => ({
       id: c.id,
+      userId: c.user_id,
       author: c.author,
       content: c.content,
       upvotes: c.upvotes,
@@ -275,6 +277,34 @@ export async function voteOnPost(id: string, delta: 1 | -1) {
   emit();
   const post = _posts.find((p) => p.id === id);
   if (post) await supabase.from("posts").update({ upvotes: post.upvotes, downvotes: post.downvotes }).eq("id", id);
+}
+
+export async function deletePost(id: string) {
+  if (typeof window === "undefined") return;
+  await supabase.from("posts").delete().eq("id", id).eq("user_id", _userId);
+  _posts = _posts.filter((p) => p.id !== id);
+  emit();
+}
+
+export async function deleteComment(postId: string, commentId: string) {
+  if (typeof window === "undefined") return;
+  await supabase.from("comments").delete().eq("id", commentId).eq("user_id", _userId);
+  _posts = _posts.map((p) => p.id === postId ? { ...p, comments: p.comments.filter((c) => c.id !== commentId) } : p);
+  emit();
+}
+
+export async function editPost(id: string, content: string) {
+  if (typeof window === "undefined") return;
+  await supabase.from("posts").update({ content }).eq("id", id).eq("user_id", _userId);
+  _posts = _posts.map((p) => p.id === id ? { ...p, content } : p);
+  emit();
+}
+
+export async function editComment(postId: string, commentId: string, content: string) {
+  if (typeof window === "undefined") return;
+  await supabase.from("comments").update({ content }).eq("id", commentId).eq("user_id", _userId);
+  _posts = _posts.map((p) => p.id === postId ? { ...p, comments: p.comments.map((c) => c.id === commentId ? { ...c, content } : c) } : p);
+  emit();
 }
 
 export async function saveProfile(p: Profile) {
