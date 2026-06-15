@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useStore, getUserId } from "@/lib/datedata/store";
 import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
 import { earnedBadges } from "@/lib/datedata/badges";
@@ -22,6 +22,8 @@ const MOOD_COLORS = ["#ec4899", "#f472b6", "#fb7185", "#fda4af", "#fecdd3"];
 function Stats() {
   const { entries, profile, loading } = useStore();
   const userId = getUserId();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const mine = entries.filter((e) => e.userId === userId);
 
   const totalSpent = mine.reduce((a, e) => a + e.amountCents, 0);
@@ -217,16 +219,18 @@ function Stats() {
           <div className="rounded-2xl border border-border bg-card p-5">
             <p className="text-sm text-muted-foreground mb-4">Mood Distribution</p>
             <div className="h-64">
-              {moodDist.length > 0 ? (
-                <ResponsiveContainer>
-                  <PieChart>
-                    <Pie data={moodDist} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={2}>
-                      {moodDist.map((_, i) => <Cell key={i} fill={MOOD_COLORS[i % MOOD_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : <p className="text-sm text-muted-foreground text-center py-10">No data yet.</p>}
+              {mounted ? (
+                moodDist.length > 0 ? (
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={moodDist} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={2}>
+                        {moodDist.map((_, i) => <Cell key={i} fill={MOOD_COLORS[i % MOOD_COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : <p className="text-sm text-muted-foreground text-center py-10">No data yet.</p>
+              ) : null}
             </div>
           </div>
         </div>

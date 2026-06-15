@@ -20,7 +20,7 @@ for (const file of readdirSync(functionsDir)) {
 
 // Vercel function config
 writeFileSync(join(funcDir, '.vc-config.json'), JSON.stringify({
-  runtime: 'nodejs24.x',
+  runtime: 'nodejs20.x',
   handler: 'index.mjs',
   launcherType: 'Nodejs',
   shouldAddHelpers: false,
