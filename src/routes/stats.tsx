@@ -1,11 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo } from "react";
 import { useStore, getUserId } from "@/lib/datedata/store";
 import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
 import { earnedBadges } from "@/lib/datedata/badges";
 import { Calendar, DollarSign, TrendingUp, Heart, Share2 } from "lucide-react";
 import { sharePersonalCard } from "@/lib/shareCard";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 export const Route = createFileRoute("/stats")({
   head: () => ({
@@ -19,11 +18,49 @@ export const Route = createFileRoute("/stats")({
 
 const MOOD_COLORS = ["#ec4899", "#f472b6", "#fb7185", "#fda4af", "#fecdd3"];
 
+function DonutChart({ data }: { data: { name: string; value: number }[] }) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (!total) return <p className="text-sm text-muted-foreground text-center py-10">No data yet.</p>;
+  const cx = 100, cy = 100, R = 80, r = 52;
+  let angle = -Math.PI / 2;
+  const slices = data.map((d, i) => {
+    const sweep = (d.value / total) * 2 * Math.PI;
+    const start = angle;
+    angle += sweep;
+    return { d, start, end: angle, color: MOOD_COLORS[i % MOOD_COLORS.length] };
+  });
+  function arc(s: number, e: number, outerR: number, innerR: number) {
+    const large = e - s > Math.PI ? 1 : 0;
+    const cos = Math.cos, sin = Math.sin;
+    return [
+      `M${cx + outerR * cos(s)},${cy + outerR * sin(s)}`,
+      `A${outerR},${outerR},0,${large},1,${cx + outerR * cos(e)},${cy + outerR * sin(e)}`,
+      `L${cx + innerR * cos(e)},${cy + innerR * sin(e)}`,
+      `A${innerR},${innerR},0,${large},0,${cx + innerR * cos(s)},${cy + innerR * sin(s)}`,
+      "Z",
+    ].join(" ");
+  }
+  return (
+    <div className="flex items-center gap-6 h-64">
+      <svg viewBox="0 0 200 200" className="w-40 h-40 shrink-0">
+        {slices.map((s, i) => <path key={i} d={arc(s.start, s.end, R, r)} fill={s.color} />)}
+      </svg>
+      <div className="space-y-2 flex-1">
+        {slices.map((s, i) => (
+          <div key={i} className="flex items-center gap-2 text-sm">
+            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
+            <span className="text-muted-foreground truncate">{s.d.name}</span>
+            <span className="font-bold ml-auto">{Math.round((s.d.value / total) * 100)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Stats() {
   const { entries, profile, loading } = useStore();
   const userId = getUserId();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
   const mine = entries.filter((e) => e.userId === userId);
 
   const totalSpent = mine.reduce((a, e) => a + e.amountCents, 0);
@@ -218,20 +255,7 @@ function Stats() {
 
           <div className="rounded-2xl border border-border bg-card p-5">
             <p className="text-sm text-muted-foreground mb-4">Mood Distribution</p>
-            <div className="h-64">
-              {mounted ? (
-                moodDist.length > 0 ? (
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie data={moodDist} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={2}>
-                        {moodDist.map((_, i) => <Cell key={i} fill={MOOD_COLORS[i % MOOD_COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : <p className="text-sm text-muted-foreground text-center py-10">No data yet.</p>
-              ) : null}
-            </div>
+            <DonutChart data={moodDist} />
           </div>
         </div>
 
