@@ -26,9 +26,7 @@ writeFileSync(join(funcDir, '.vc-config.json'), JSON.stringify({
   shouldAddHelpers: false,
 }, null, 2));
 
-// Vercel routing config — SPA mode: all routes fall back to index.html so
-// TanStack Router handles navigation entirely client-side. This avoids SSR
-// hydration mismatches that break back-button and hard-refresh.
+// Vercel routing config
 writeFileSync('.vercel/output/config.json', JSON.stringify({
   version: 3,
   routes: [
@@ -38,7 +36,7 @@ writeFileSync('.vercel/output/config.json', JSON.stringify({
       continue: true,
     },
     { handle: 'filesystem' },
-    { src: '/(.*)', dest: '/index.html' },
+    { src: '/(.*)', dest: '/index.func' },
   ],
 }, null, 2));
 
