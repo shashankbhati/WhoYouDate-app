@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import type { Entry, Post, Profile } from "./types";
-import { seedEntries, seedEntriesIndia, seedEntriesUS, seedPosts } from "./seed";
+import { seedEntries, seedEntriesIndia, seedEntriesUS, seedEntriesDresden, seedPosts } from "./seed";
 
 // ── Module-level cache (shared across all component instances) ──────────────
 let _entries: Entry[] = [];
@@ -149,6 +149,14 @@ async function initialize() {
 
     if (await shouldSeedCountry("seeded_us")) {
       const seeds = seedEntriesUS();
+      for (let i = 0; i < seeds.length; i += 100) {
+        await supabase.from("entries").insert(seeds.slice(i, i + 100).map(entryToRow));
+      }
+      seeded = true;
+    }
+
+    if (await shouldSeedCountry("seeded_dresden")) {
+      const seeds = seedEntriesDresden();
       for (let i = 0; i < seeds.length; i += 100) {
         await supabase.from("entries").insert(seeds.slice(i, i + 100).map(entryToRow));
       }

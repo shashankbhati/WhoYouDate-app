@@ -1,9 +1,21 @@
 import type { Entry, Post } from "./types";
 
-const FEMALE_NAMES = ["Sabrina", "Laura", "Mia", "Julia", "Emma", "Lena", "Anna", "Sophie", "Hannah", "Katharina", "Lisa", "Marie", "Sarah", "Nina", "Lea", "Jana", "Monika", "Petra", "Sandra", "Stefanie", "Lina", "Johanna"];
-const MALE_NAMES = ["Sven", "Klaus", "Robert", "Maximilian", "Jens", "Jan", "Tim", "Felix", "Lukas", "Paul", "Noah", "Leon", "Tobias", "Stefan", "Michael", "Florian", "Patrick", "Christian", "Andreas", "Markus", "Thomas"];
+const FEMALE_NAMES = ["Sabrina", "Laura", "Mia", "Julia", "Emma", "Lena", "Anna", "Sophie", "Hannah", "Katharina", "Lisa", "Marie", "Sarah", "Nina", "Lea", "Jana", "Monika", "Petra", "Sandra", "Stefanie", "Lina", "Johanna", "Franziska", "Klara", "Luise"];
+const MALE_NAMES = ["Sven", "Klaus", "Robert", "Maximilian", "Jens", "Jan", "Tim", "Felix", "Lukas", "Paul", "Noah", "Leon", "Tobias", "Stefan", "Michael", "Florian", "Patrick", "Christian", "Andreas", "Markus", "Thomas", "Hannes", "Moritz", "Benedikt"];
 const ALL_NAMES = [...FEMALE_NAMES, ...MALE_NAMES];
-const CITIES = ["Berlin", "Munich", "Hamburg", "Cologne", "Frankfurt"];
+const CITIES = ["Berlin", "Munich", "Hamburg", "Cologne", "Frankfurt", "Dresden"];
+
+// Export name sets so UI can categorize entries by gender
+export const FEMALE_NAMES_ALL = new Set([
+  ...FEMALE_NAMES,
+  "Priya", "Neha", "Aditi", "Anjali", "Pooja", "Riya", "Sneha", "Ananya", "Kavya", "Divya", "Ishita", "Simran", "Nisha", "Ayesha", "Sana",
+  "Ashley", "Jessica", "Emily", "Olivia", "Emma", "Megan", "Sarah", "Chloe", "Madison", "Brittany", "Taylor", "Amanda", "Lauren", "Kayla", "Samantha",
+]);
+export const MALE_NAMES_ALL = new Set([
+  ...MALE_NAMES,
+  "Rahul", "Amit", "Suresh", "Raj", "Dev", "Aarav", "Rohit", "Arjun", "Karan", "Aditya", "Akash", "Varun", "Nikhil", "Siddharth", "Vivek",
+  "Tyler", "Ryan", "Jake", "Brandon", "Chase", "Noah", "Michael", "Chris", "Alex", "Josh", "Kevin", "Matt", "Derek", "Ethan", "Jordan",
+]);
 const ACTS: Entry["activity"][] = ["food_date", "movie", "gift", "trip", "coffee", "other"];
 const MEET_VIA = ["bumble", "hinge", "tinder", "friends", "work_school", "in_person", "other_app"] as const;
 const SECOND_DATE = ["yes", "no", "together"] as const;
@@ -160,6 +172,44 @@ export function seedEntries(): Entry[] {
     out.push({ id: uid(), userId: "seed_" + uid(), activity, amountCents: amount, currency: "EUR", partnerName: "Johanna", mood, meetVia: weightedRand([...MEET_VIA], [10, 50, 15, 10, 10, 3, 2]), secondDate: (Math.random() < sd ? (mood === 5 && Math.random() < 0.45 ? "together" : "yes") : "no") as Entry["secondDate"], city, entryDate: new Date(now - daysAgo * 86400000).toISOString(), createdAt: new Date(now - daysAgo * 86400000).toISOString() });
   }
 
+  return out;
+}
+
+export function seedEntriesDresden(): Entry[] {
+  const out: Entry[] = [];
+  const now = Date.now();
+  const ACTS: Entry["activity"][] = ["food_date", "movie", "gift", "trip", "coffee", "other"];
+  const MEET_VIA_D = ["bumble", "hinge", "tinder", "friends", "work_school", "in_person", "other_app"] as const;
+  const ACT_W = [32, 18, 10, 8, 28, 4];
+  const MOOD_W = [15, 22, 28, 22, 13];
+
+  // ~80 random Dresden entries
+  for (let i = 0; i < 80; i++) {
+    const partnerName = ALL_NAMES[Math.floor(Math.random() * ALL_NAMES.length)];
+    const activity = weightedRand(ACTS, ACT_W);
+    const base = activity === "trip" ? 32000 : activity === "gift" ? 8500 : activity === "food_date" ? 7000 : activity === "movie" ? 2500 : activity === "coffee" ? 850 : 4000;
+    const amount = Math.max(300, Math.round(base * (0.55 + Math.random() * 1.2)));
+    const mood = weightedRand([1, 2, 3, 4, 5], MOOD_W) as Entry["mood"];
+    const sd = mood >= 4 ? 0.62 : mood === 3 ? 0.38 : 0.13;
+    const daysAgo = Math.floor(Math.random() * 90);
+    out.push({ id: uid(), userId: "seed_" + uid(), activity, amountCents: amount, currency: "EUR", partnerName, mood, meetVia: MEET_VIA_D[Math.floor(Math.random() * MEET_VIA_D.length)], secondDate: (Math.random() < sd ? "yes" : "no") as Entry["secondDate"], city: "Dresden", entryDate: new Date(now - daysAgo * 86400000).toISOString(), createdAt: new Date(now - daysAgo * 86400000).toISOString() });
+  }
+  // Franziska — costliest girl in Dresden (trips + expensive dinners)
+  for (let i = 0; i < 12; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: i % 3 === 0 ? "trip" : "food_date", amountCents: 38000 + Math.floor(Math.random() * 14000), currency: "EUR", partnerName: "Franziska", mood: 5, meetVia: "hinge", secondDate: "together", city: "Dresden", entryDate: new Date(now - i * 86400000 * 2).toISOString(), createdAt: new Date(now - i * 86400000 * 2).toISOString() });
+  }
+  // Hannes — costliest guy in Dresden
+  for (let i = 0; i < 10; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: i % 2 === 0 ? "trip" : "gift", amountCents: 29000 + Math.floor(Math.random() * 12000), currency: "EUR", partnerName: "Hannes", mood: 4, meetVia: "bumble", secondDate: "yes", city: "Dresden", entryDate: new Date(now - i * 86400000 * 3).toISOString(), createdAt: new Date(now - i * 86400000 * 3).toISOString() });
+  }
+  // Klara — frequently dated, coffee + movies, high happiness
+  for (let i = 0; i < 9; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: i % 2 === 0 ? "coffee" : "movie", amountCents: 1200 + Math.floor(Math.random() * 600), currency: "EUR", partnerName: "Klara", mood: (Math.floor(Math.random() * 2) + 4) as Entry["mood"], meetVia: "tinder", secondDate: "yes", city: "Dresden", entryDate: new Date(now - i * 86400000 * 2).toISOString(), createdAt: new Date(now - i * 86400000 * 2).toISOString() });
+  }
+  // Moritz — mid-range, lots of food dates
+  for (let i = 0; i < 8; i++) {
+    out.push({ id: uid(), userId: "seed_" + uid(), activity: "food_date", amountCents: 9500 + Math.floor(Math.random() * 3000), currency: "EUR", partnerName: "Moritz", mood: 3, meetVia: "friends", secondDate: Math.random() > 0.5 ? "yes" : "no", city: "Dresden", entryDate: new Date(now - i * 86400000 * 4).toISOString(), createdAt: new Date(now - i * 86400000 * 4).toISOString() });
+  }
   return out;
 }
 

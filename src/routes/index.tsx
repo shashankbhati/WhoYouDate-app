@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore, addPost, addComment, voteOnPost, getUserId, deletePost, deleteComment, editPost, editComment } from "@/lib/datedata/store";
+import { FEMALE_NAMES_ALL, MALE_NAMES_ALL } from "@/lib/datedata/seed";
 import { ACTIVITY_META } from "@/lib/datedata/types";
 import { detectPII } from "@/lib/datedata/pii";
 import { isRealUser, openAuthModal } from "@/lib/auth";
@@ -67,6 +68,8 @@ function Home() {
   const { entries, posts, loading, profile } = useStore();
   const { country, config } = useCountry();
   const [city, setCity] = useState<string>(config.defaultCity);
+  const [costliestGender, setCostliestGender] = useState<"all" | "f" | "m">("all");
+  const [trendingGender, setTrendingGender] = useState<"all" | "f" | "m">("all");
   const [partnerMetric, setPartnerMetric] = useState<"cost" | "happy" | "dates">("cost");
   const [tab, setTab] = useState<"feed" | "lookup" | "hot" | "new" | "top">("hot");
   const [draft, setDraft] = useState("");
@@ -86,8 +89,13 @@ function Home() {
   const avgMood = displayEntries.length ? displayEntries.reduce((a, e) => a + e.mood, 0) / displayEntries.length : 0;
   const spentLabel = `${config.currencySymbol}${(totalSpent / 100000).toFixed(1)}K`;
 
+  function genderFilter(g: "all" | "f" | "m") {
+    return (name: string) =>
+      g === "all" ? true : g === "f" ? FEMALE_NAMES_ALL.has(name) : MALE_NAMES_ALL.has(name);
+  }
+
   const costliest = useMemo(() => {
-    const inCity = displayEntries.filter((e) => e.city === city);
+    const inCity = displayEntries.filter((e) => e.city === city && genderFilter(costliestGender)(e.partnerName));
     const byName: Record<string, { sum: number; count: number }> = {};
     inCity.forEach((e) => { (byName[e.partnerName] ??= { sum: 0, count: 0 }); byName[e.partnerName].sum += e.amountCents; byName[e.partnerName].count++; });
     return Object.entries(byName)
@@ -95,16 +103,19 @@ function Home() {
       .map(([name, v]) => ({ name, value: v.sum / v.count }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 6);
-  }, [displayEntries, city]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayEntries, city, costliestGender]);
 
   const trendingPartner = useMemo(() => {
+    const filtered = displayEntries.filter((e) => genderFilter(trendingGender)(e.partnerName));
     const byName: Record<string, { sum: number; happy: number; count: number }> = {};
-    displayEntries.forEach((e) => { (byName[e.partnerName] ??= { sum: 0, happy: 0, count: 0 }); byName[e.partnerName].sum += e.amountCents; if (e.mood >= 4) byName[e.partnerName].happy++; byName[e.partnerName].count++; });
+    filtered.forEach((e) => { (byName[e.partnerName] ??= { sum: 0, happy: 0, count: 0 }); byName[e.partnerName].sum += e.amountCents; if (e.mood >= 4) byName[e.partnerName].happy++; byName[e.partnerName].count++; });
     return Object.entries(byName).map(([name, v]) => ({
       name,
       value: partnerMetric === "cost" ? v.sum / v.count : partnerMetric === "happy" ? (v.happy / v.count) * 100 : v.count,
     })).sort((a, b) => b.value - a.value).slice(0, 6);
-  }, [displayEntries, partnerMetric]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayEntries, partnerMetric, trendingGender]);
 
   const trendingActivity = useMemo(() => {
     const c: Record<string, number> = {};
@@ -192,6 +203,12 @@ function Home() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-xs font-bold tracking-wider">💸 COSTLIEST NAMES TO DATE</h2>
             <div className="flex flex-wrap gap-1">
+              {(["all", "f", "m"] as const).map((g) => (
+                <button key={g} onClick={() => setCostliestGender(g)} className={`px-2 py-0.5 rounded-full text-xs font-medium transition ${costliestGender === g ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+                  {g === "all" ? "All" : g === "f" ? "👩 Girls" : "👦 Boys"}
+                </button>
+              ))}
+              <div className="w-px bg-border mx-0.5" />
               {(config.cities as readonly string[]).map((c) => (
                 <button key={c} onClick={() => setCity(c)} className={`px-2 py-0.5 rounded-full text-xs font-medium transition ${city === c ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{c}</button>
               ))}
@@ -214,7 +231,13 @@ function Home() {
         <section className="rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-xs font-bold tracking-wider">📈 TRENDING PARTNER NAMES</h2>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
+              {(["all", "f", "m"] as const).map((g) => (
+                <button key={g} onClick={() => setTrendingGender(g)} className={`px-2 py-0.5 rounded-full text-xs font-medium transition ${trendingGender === g ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+                  {g === "all" ? "All" : g === "f" ? "👩 Girls" : "👦 Boys"}
+                </button>
+              ))}
+              <div className="w-px bg-border mx-0.5" />
               {[["cost", "💸 Cost"], ["happy", "😍 Happy"], ["dates", "💗 Dates"]].map(([k, l]) => (
                 <button key={k} onClick={() => setPartnerMetric(k as typeof partnerMetric)} className={`px-2 py-0.5 rounded-full text-xs font-medium transition ${partnerMetric === k ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{l}</button>
               ))}

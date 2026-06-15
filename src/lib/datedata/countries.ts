@@ -2,7 +2,7 @@ export const COUNTRY_CONFIG = {
   all: {
     label: "Global",
     flag: "🌍",
-    cities: ["Berlin", "Munich", "Hamburg", "Cologne", "Frankfurt", "Delhi", "Mumbai", "Bangalore", "Hyderabad", "Pune", "Chennai", "New York", "Los Angeles", "Chicago", "Austin", "Miami"],
+    cities: ["Berlin", "Munich", "Hamburg", "Cologne", "Frankfurt", "Dresden", "Delhi", "Mumbai", "Bangalore", "Hyderabad", "Pune", "Chennai", "New York", "Los Angeles", "Chicago", "Austin", "Miami"],
     defaultCity: "Berlin",
     defaultCurrency: "EUR",
     currencySymbol: "€",
@@ -18,7 +18,7 @@ export const COUNTRY_CONFIG = {
   DE: {
     label: "Germany",
     flag: "🇩🇪",
-    cities: ["Berlin", "Munich", "Hamburg", "Cologne", "Frankfurt"],
+    cities: ["Berlin", "Munich", "Hamburg", "Cologne", "Frankfurt", "Dresden"],
     defaultCity: "Berlin",
     defaultCurrency: "EUR",
     currencySymbol: "€",
