@@ -54,7 +54,7 @@ export function AuthModal({ open, message }: Props) {
       const msg = err instanceof Error ? err.message : "Something went wrong.";
       if (msg.includes("Invalid login")) toast.error("Wrong email or password.");
       else if (msg.includes("already registered")) toast.error("Account exists. Sign in instead.");
-      else toast.error(msg);
+      else toast.error("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
