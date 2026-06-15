@@ -36,7 +36,7 @@ writeFileSync('.vercel/output/config.json', JSON.stringify({
       continue: true,
     },
     { handle: 'filesystem' },
-    { src: '/(.*)', dest: '/index.func' },
+    { src: '/(.*)', dest: '/index' },
   ],
 }, null, 2));
 
