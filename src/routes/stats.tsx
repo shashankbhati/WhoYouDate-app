@@ -281,13 +281,21 @@ function Stats() {
             <DonutChart data={moodDist} />
           </div>
 
-          {mapReady && mine.some((e) => e.lat != null) && (
+          {mapReady && mine.length > 0 && (
             <div className="rounded-2xl border border-border bg-card p-5">
               <h3 className="font-bold mb-1">🗺️ Your Dating Map</h3>
               <p className="text-sm text-muted-foreground mb-4">Cities where you've been on dates — click a pin for details</p>
-              <Suspense fallback={<div className="h-64 rounded-xl bg-muted animate-pulse" />}>
-                <DatingMap entries={mine} currencySymbol={currencySymbol} />
-              </Suspense>
+              {mine.some((e) => e.lat != null) ? (
+                <Suspense fallback={<div className="h-64 rounded-xl bg-muted animate-pulse" />}>
+                  <DatingMap entries={mine} currencySymbol={currencySymbol} />
+                </Suspense>
+              ) : (
+                <div className="h-48 rounded-xl bg-muted/40 border border-dashed border-border flex flex-col items-center justify-center gap-2 text-center px-6">
+                  <span className="text-3xl">📍</span>
+                  <p className="text-sm font-medium">No pins yet</p>
+                  <p className="text-xs text-muted-foreground">Log a new date and pick a city from the autocomplete — it'll appear here as a pin on the map</p>
+                </div>
+              )}
             </div>
           )}
 
