@@ -73,6 +73,7 @@ function Home() {
   const [partnerMetric, setPartnerMetric] = useState<"cost" | "happy" | "dates">("cost");
   const [tab, setTab] = useState<"feed" | "lookup">("feed");
   const [feedSort, setFeedSort] = useState<"hot" | "new" | "top">("hot");
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLInputElement>(null);
 
@@ -135,18 +136,26 @@ function Home() {
     const pii = detectPII(content);
     if (pii) { toast.error(`Looks like you included a ${pii}. Please remove and try again.`); return; }
     if (content.length > 500) { toast.error("Posts max 500 chars."); return; }
-    addPost({ id: Math.random().toString(36).slice(2), author: profile?.displayName ?? "anon", type: "experience", tags: ["Experience"], content, upvotes: 1, downvotes: 0, comments: [], createdAt: new Date().toISOString() });
+    const tags = [...new Set((content.match(/#[\w]+/g) ?? []).map((t) => t.slice(1).toLowerCase()))];
+    addPost({ id: Math.random().toString(36).slice(2), author: profile?.displayName ?? "anon", type: "experience", tags: tags.length ? tags : ["experience"], content, upvotes: 1, downvotes: 0, comments: [], createdAt: new Date().toISOString() });
     setDraft("");
     toast.success("Posted anonymously");
   }
 
   const visiblePosts = useMemo(() => {
-    const arr = [...posts];
+    let arr = [...posts];
+    if (tagFilter) {
+      const f = tagFilter.toLowerCase();
+      arr = arr.filter((p) =>
+        p.tags.some((t) => t.toLowerCase().includes(f)) ||
+        p.content.toLowerCase().includes("#" + f)
+      );
+    }
     if (feedSort === "new") arr.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
     else if (feedSort === "top") arr.sort((a, b) => b.upvotes - a.upvotes);
     else arr.sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes));
     return arr;
-  }, [posts, feedSort]);
+  }, [posts, feedSort, tagFilter]);
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-6">
@@ -290,6 +299,7 @@ function Home() {
           {tab === "lookup" ? (
             <div className="space-y-4">
               <NameAnalyticsPanel entries={displayEntries} currency={config.defaultCurrency} featuredNames={FEATURED_NAMES[country]} />
+              <CityHotspotsPanel entries={displayEntries} />
               <CityComparisonPanel entries={displayEntries} config={config} />
             </div>
           ) : (
@@ -323,7 +333,7 @@ function Home() {
               )}
 
               <div className="space-y-3">
-                {visiblePosts.map((p) => <PostCard key={p.id} post={p} />)}
+                {visiblePosts.map((p) => <PostCard key={p.id} post={p} onTagFilter={setTagFilter} />)}
                 {!loading && visiblePosts.length === 0 && (
                   <div className="rounded-2xl border border-border bg-card p-10 text-center">
                     <p className="text-muted-foreground text-sm">No posts yet. Be the first to share!</p>
@@ -347,11 +357,26 @@ function Home() {
 
             <h3 className="text-xs font-bold tracking-widest text-muted-foreground mt-5 mb-3">TOPICS</h3>
             <div className="space-y-1">
-              {(["All entries", "first dates", "red flags", "wins", "ghosted", "split the bill", "advice"] as const).map((l, i) => (
-                <button key={l} className={`flex items-center gap-2 w-full text-left px-2 py-1 text-sm rounded transition ${i === 0 ? "text-primary font-semibold" : "text-foreground hover:text-primary"}`}>
-                  <span className="text-muted-foreground">#</span>{l}
-                </button>
-              ))}
+              {([
+                { label: "All entries", tag: null },
+                { label: "firstdate", tag: "firstdate" },
+                { label: "redflag", tag: "redflag" },
+                { label: "win", tag: "win" },
+                { label: "ghosted", tag: "ghosted" },
+                { label: "splitthebill", tag: "splitthebill" },
+                { label: "advice", tag: "advice" },
+              ] as const).map(({ label, tag }) => {
+                const active = tag === null ? tagFilter === null : tagFilter === tag;
+                return (
+                  <button
+                    key={label}
+                    onClick={() => setTagFilter(tag)}
+                    className={`flex items-center gap-2 w-full text-left px-2 py-1 text-sm rounded transition ${active ? "text-primary font-semibold" : "text-foreground hover:text-primary"}`}
+                  >
+                    <span className="text-muted-foreground">#</span>{label}
+                  </button>
+                );
+              })}
             </div>
 
             <h3 className="text-xs font-bold tracking-widest text-muted-foreground mt-5 mb-3">YOU</h3>
@@ -380,7 +405,15 @@ function Home() {
   );
 }
 
-function PostCard({ post: p }: { post: ReturnType<typeof useStore>["posts"][0] }) {
+function renderContent(text: string, onTag?: (t: string) => void) {
+  return text.split(/(#[\w]+)/g).map((part, i) =>
+    part.startsWith("#")
+      ? <button key={i} type="button" onClick={() => onTag?.(part.slice(1).toLowerCase())} className="text-primary hover:underline font-medium">{part}</button>
+      : <span key={i}>{part}</span>
+  );
+}
+
+function PostCard({ post: p, onTagFilter }: { post: ReturnType<typeof useStore>["posts"][0]; onTagFilter?: (tag: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -481,7 +514,7 @@ function PostCard({ post: p }: { post: ReturnType<typeof useStore>["posts"][0] }
               </div>
             </div>
           ) : (
-            <p className="text-sm leading-relaxed">{p.content}</p>
+            <p className="text-sm leading-relaxed">{renderContent(p.content, onTagFilter)}</p>
           )}
 
           <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
@@ -761,6 +794,43 @@ function NameAnalyticsPanel({ entries, currency, featuredNames }: { entries: Ret
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function CityHotspotsPanel({ entries }: { entries: ReturnType<typeof useStore>["entries"] }) {
+  const cityData = useMemo(() => {
+    const map: Record<string, number> = {};
+    entries.forEach((e) => { map[e.city] = (map[e.city] ?? 0) + 1; });
+    return Object.entries(map)
+      .map(([city, count]) => ({ city, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [entries]);
+
+  if (cityData.length < 2) return null;
+
+  const max = Math.max(1, ...cityData.map((c) => c.count));
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <h2 className="text-xs font-bold tracking-wider mb-1">🗺️ DATING HOTSPOTS</h2>
+      <p className="text-xs text-muted-foreground mb-5">Where people are dating most — bubble size = activity</p>
+      <div className="flex flex-wrap gap-4 items-end justify-center py-2">
+        {cityData.map(({ city, count }) => {
+          const size = Math.round(28 + (count / max) * 72);
+          return (
+            <div key={city} className="flex flex-col items-center gap-2">
+              <div
+                className="rounded-full bg-primary/20 border-2 border-primary/60 grid place-items-center text-primary font-bold transition-all"
+                style={{ width: size, height: size, fontSize: Math.max(9, size * 0.22) }}
+              >
+                {count}
+              </div>
+              <span className="text-xs text-muted-foreground text-center max-w-[64px] truncate">{city}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

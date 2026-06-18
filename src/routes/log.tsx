@@ -5,6 +5,9 @@ import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/dateda
 import { detectPII } from "@/lib/datedata/pii";
 import { isRealUser, openAuthModal } from "@/lib/auth";
 import { getCountryConfig } from "@/lib/country";
+import { COUNTRY_CONFIG } from "@/lib/datedata/countries";
+
+const ALL_CITIES = [...COUNTRY_CONFIG.all.cities];
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/log")({
@@ -40,6 +43,7 @@ function LogDate() {
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<string>(() => getCountryConfig().defaultCurrency);
   const [partner, setPartner] = useState("");
+  const [city, setCity] = useState<string>(() => getProfile()?.city ?? getCountryConfig().defaultCity);
   const [meet, setMeet] = useState<string | undefined>();
   const [mood, setMood] = useState<Mood | null>(null);
   const [second, setSecond] = useState<typeof SECOND[number]["id"] | undefined>();
@@ -67,7 +71,7 @@ function LogDate() {
       mood,
       meetVia: meet,
       secondDate: second,
-      city: profile?.city ?? getCountryConfig().defaultCity,
+      city,
       entryDate: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     });
@@ -102,8 +106,14 @@ function LogDate() {
           </Field>
         </div>
 
-        <Field label="Partner Display Name" required>
-          <input value={partner} onChange={(e) => setPartner(e.target.value)} placeholder="Nickname only, e.g. Sam, Luna..." className="w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40" />
+        <Field label="Partner First Name" required>
+          <input value={partner} onChange={(e) => setPartner(e.target.value)} placeholder="First name only, e.g. Sam, Luna..." className="w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40" />
+        </Field>
+
+        <Field label="City (where did the date happen?)" required>
+          <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40">
+            {ALL_CITIES.map((c) => <option key={c}>{c}</option>)}
+          </select>
         </Field>
 
         <Field label="How did you meet?" optional>

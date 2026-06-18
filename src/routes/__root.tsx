@@ -128,7 +128,7 @@ function Footer() {
     <footer className="border-t border-border mt-12">
       <div className="mx-auto max-w-7xl px-4 py-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <span className="font-bold text-foreground">whoami</span>
+          <span className="font-bold text-foreground">WhoAmIDating</span>
           <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
             An anonymous ledger of modern dating. No names. No numbers. No apps tracking you back.
           </p>

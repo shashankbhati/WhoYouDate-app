@@ -114,6 +114,24 @@ function Stats() {
     return Object.entries(c).map(([m, count]) => ({ name: `${MOOD_META[+m as Mood].emoji} ${MOOD_META[+m as Mood].label}`, value: count }));
   }, [mine]);
 
+  const partnerStats = useMemo(() => {
+    const map: Record<string, { count: number; total: number; moods: number[] }> = {};
+    mine.forEach((e) => {
+      if (!map[e.partnerName]) map[e.partnerName] = { count: 0, total: 0, moods: [] };
+      map[e.partnerName].count++;
+      map[e.partnerName].total += e.amountCents;
+      map[e.partnerName].moods.push(e.mood);
+    });
+    return Object.entries(map)
+      .map(([name, v]) => ({
+        name,
+        count: v.count,
+        avgSpend: Math.round(v.total / v.count),
+        avgMood: v.moods.reduce((a, b) => a + b, 0) / v.moods.length,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [mine]);
+
   const badges = earnedBadges(mine);
   const recent = mine.slice(0, 5);
 
@@ -257,6 +275,33 @@ function Stats() {
             <p className="text-sm text-muted-foreground mb-4">Mood Distribution</p>
             <DonutChart data={moodDist} />
           </div>
+
+          {partnerStats.length > 0 && (
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <h3 className="font-bold mb-1">💞 Your Partners</h3>
+              <p className="text-sm text-muted-foreground mb-4">All your dates grouped by first name. Community stats count all users together.</p>
+              <div className="space-y-3">
+                {partnerStats.map((p) => (
+                  <div key={p.name} className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/20 grid place-items-center text-primary font-bold shrink-0 text-sm">
+                      {p.name[0]?.toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{p.name}</span>
+                        <span className="text-sm font-bold text-primary">{currencySymbol}{(p.avgSpend / 100).toFixed(0)}/date</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                        <span>{p.count} date{p.count !== 1 ? "s" : ""}</span>
+                        <span>·</span>
+                        <span>avg mood {p.avgMood.toFixed(1)} ⭐</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <aside className="space-y-4">
