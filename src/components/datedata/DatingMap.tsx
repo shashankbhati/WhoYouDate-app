@@ -1,6 +1,6 @@
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Entry } from "@/lib/datedata/types";
 
 interface CityPin {
@@ -25,17 +25,56 @@ function AutoFit({ pins }: { pins: CityPin[] }) {
       );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pins.length]);
   return null;
 }
 
 export default function DatingMap({ entries, currencySymbol }: { entries: Entry[]; currencySymbol: string }) {
+  const [geocoded, setGeocoded] = useState<Record<string, { lat: number; lon: number }>>({});
+  const [geocoding, setGeocoding] = useState(false);
+
+  // Find unique city names that have no stored lat/lon
+  const missingCities = useMemo(() => {
+    const set = new Set<string>();
+    entries.forEach((e) => { if (e.lat == null) set.add(e.city); });
+    return [...set];
+  }, [entries]);
+
+  // Geocode missing cities via Nominatim (sequential, ~400ms apart)
+  useEffect(() => {
+    if (missingCities.length === 0) return;
+    let cancelled = false;
+    setGeocoding(true);
+    (async () => {
+      for (let i = 0; i < missingCities.length; i++) {
+        if (cancelled) break;
+        const city = missingCities[i];
+        if (geocoded[city]) continue;
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`
+          );
+          const data = await res.json();
+          if (data[0] && !cancelled) {
+            setGeocoded((prev) => ({ ...prev, [city]: { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } }));
+          }
+        } catch { /* skip */ }
+        if (i < missingCities.length - 1) await new Promise((r) => setTimeout(r, 420));
+      }
+      if (!cancelled) setGeocoding(false);
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingCities.join(",")]);
+
   const pins = useMemo<CityPin[]>(() => {
     const map: Record<string, CityPin & { moods: number[] }> = {};
     entries.forEach((e) => {
-      if (e.lat == null || e.lon == null) return;
-      const key = `${e.lat.toFixed(2)}_${e.lon.toFixed(2)}`;
-      if (!map[key]) map[key] = { lat: e.lat, lon: e.lon, city: e.city, count: 0, totalCents: 0, avgMood: 0, moods: [] };
+      const lat = e.lat ?? geocoded[e.city]?.lat;
+      const lon = e.lon ?? geocoded[e.city]?.lon;
+      if (lat == null || lon == null) return;
+      const key = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
+      if (!map[key]) map[key] = { lat, lon, city: e.city, count: 0, totalCents: 0, avgMood: 0, moods: [] };
       map[key].count++;
       map[key].totalCents += e.amountCents;
       map[key].moods.push(e.mood);
@@ -44,22 +83,24 @@ export default function DatingMap({ entries, currencySymbol }: { entries: Entry[
       ...pin,
       avgMood: moods.reduce((a, b) => a + b, 0) / moods.length,
     }));
-  }, [entries]);
+  }, [entries, geocoded]);
 
+  if (pins.length === 0 && geocoding) {
+    return <div className="h-64 rounded-xl bg-muted animate-pulse flex items-center justify-center text-sm text-muted-foreground">Locating your cities…</div>;
+  }
   if (pins.length === 0) return null;
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ height: 320 }}>
+    <div className="rounded-xl overflow-hidden relative" style={{ height: 320 }}>
       <MapContainer
         center={[20, 0]}
         zoom={2}
         style={{ height: "100%", width: "100%" }}
         scrollWheelZoom={false}
-        zoomControl={true}
+        attributionControl={false}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
         <AutoFit pins={pins} />
         {pins.map((pin, i) => (
@@ -69,8 +110,8 @@ export default function DatingMap({ entries, currencySymbol }: { entries: Entry[
             radius={Math.max(10, Math.min(26, 8 + pin.count * 4))}
             pathOptions={{
               fillColor: "hsl(330 81% 60%)",
-              color: "hsl(330 81% 80%)",
-              fillOpacity: 0.8,
+              color: "hsl(330 81% 40%)",
+              fillOpacity: 0.85,
               weight: 2,
             }}
           >
@@ -85,6 +126,9 @@ export default function DatingMap({ entries, currencySymbol }: { entries: Entry[
           </CircleMarker>
         ))}
       </MapContainer>
+      <p className="absolute bottom-1 right-1.5 z-[1000] text-[9px] text-gray-400 pointer-events-none">
+        © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="pointer-events-auto">OSM</a> © <a href="https://carto.com/attributions" target="_blank" rel="noreferrer" className="pointer-events-auto">CARTO</a>
+      </p>
     </div>
   );
 }
