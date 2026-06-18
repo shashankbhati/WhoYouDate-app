@@ -30,6 +30,8 @@ function rowToEntry(r: any): Entry {
     secondDate: r.second_date ?? undefined,
     note: r.note ?? undefined,
     city: r.city,
+    lat: r.lat ?? undefined,
+    lon: r.lon ?? undefined,
     entryDate: r.entry_date,
     createdAt: r.created_at,
   };
@@ -106,6 +108,8 @@ function entryToRow(e: Entry) {
     second_date: e.secondDate ?? null,
     note: e.note ?? null,
     city: e.city,
+    ...(e.lat != null ? { lat: e.lat } : {}),
+    ...(e.lon != null ? { lon: e.lon } : {}),
     entry_date: e.entryDate,
     created_at: e.createdAt,
   };
@@ -245,6 +249,8 @@ export async function addEntry(e: Entry) {
       second_date: e.secondDate ?? null,
       note: e.note ?? null,
       city: e.city,
+      ...(e.lat != null ? { lat: e.lat } : {}),
+      ...(e.lon != null ? { lon: e.lon } : {}),
       entry_date: e.entryDate,
       created_at: e.createdAt,
     })

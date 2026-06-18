@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useStore, getUserId } from "@/lib/datedata/store";
+
+const DatingMap = lazy(() => import("@/components/datedata/DatingMap"));
 import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
 import { earnedBadges } from "@/lib/datedata/badges";
 import { Calendar, DollarSign, TrendingUp, Heart, Share2 } from "lucide-react";
@@ -113,6 +115,9 @@ function Stats() {
     mine.forEach((e) => { c[e.mood] = (c[e.mood] ?? 0) + 1; });
     return Object.entries(c).map(([m, count]) => ({ name: `${MOOD_META[+m as Mood].emoji} ${MOOD_META[+m as Mood].label}`, value: count }));
   }, [mine]);
+
+  const [mapReady, setMapReady] = useState(false);
+  useEffect(() => setMapReady(true), []);
 
   const partnerStats = useMemo(() => {
     const map: Record<string, { count: number; total: number; moods: number[] }> = {};
@@ -275,6 +280,16 @@ function Stats() {
             <p className="text-sm text-muted-foreground mb-4">Mood Distribution</p>
             <DonutChart data={moodDist} />
           </div>
+
+          {mapReady && mine.some((e) => e.lat != null) && (
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <h3 className="font-bold mb-1">🗺️ Your Dating Map</h3>
+              <p className="text-sm text-muted-foreground mb-4">Cities where you've been on dates — click a pin for details</p>
+              <Suspense fallback={<div className="h-64 rounded-xl bg-muted animate-pulse" />}>
+                <DatingMap entries={mine} currencySymbol={currencySymbol} />
+              </Suspense>
+            </div>
+          )}
 
           {partnerStats.length > 0 && (
             <div className="rounded-2xl border border-border bg-card p-5">

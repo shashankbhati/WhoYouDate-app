@@ -14,6 +14,8 @@ export interface Entry {
   secondDate?: "yes" | "no" | "together";
   note?: string;
   city: string;
+  lat?: number;
+  lon?: number;
   entryDate: string; // ISO
   createdAt: string;
 }

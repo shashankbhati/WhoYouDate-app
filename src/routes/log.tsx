@@ -1,13 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { addEntry, getUserId, getProfile } from "@/lib/datedata/store";
 import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
 import { detectPII } from "@/lib/datedata/pii";
 import { isRealUser, openAuthModal } from "@/lib/auth";
 import { getCountryConfig } from "@/lib/country";
-import { COUNTRY_CONFIG } from "@/lib/datedata/countries";
-
-const ALL_CITIES = [...COUNTRY_CONFIG.all.cities];
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/log")({
@@ -19,6 +16,18 @@ export const Route = createFileRoute("/log")({
   }),
   component: LogDate,
 });
+
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  address: { city?: string; town?: string; village?: string; county?: string; state?: string; country?: string };
+}
+
+function cityNameFrom(r: NominatimResult): string {
+  return r.address.city ?? r.address.town ?? r.address.village ?? r.address.county ?? r.display_name.split(",")[0].trim();
+}
 
 const CURRENCIES = ["EUR", "USD", "INR", "GBP", "CHF"];
 const MEET = [
@@ -43,10 +52,45 @@ function LogDate() {
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<string>(() => getCountryConfig().defaultCurrency);
   const [partner, setPartner] = useState("");
-  const [city, setCity] = useState<string>(() => getProfile()?.city ?? getCountryConfig().defaultCity);
+  const [cityInput, setCityInput] = useState<string>(() => getProfile()?.city ?? getCountryConfig().defaultCity);
+  const [selectedCity, setSelectedCity] = useState<{ name: string; lat: number; lon: number } | null>(null);
+  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [meet, setMeet] = useState<string | undefined>();
   const [mood, setMood] = useState<Mood | null>(null);
   const [second, setSecond] = useState<typeof SECOND[number]["id"] | undefined>();
+
+  function handleCityChange(val: string) {
+    setCityInput(val);
+    setSelectedCity(null);
+    clearTimeout(searchTimer.current);
+    if (val.length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val)}&format=json&limit=6&addressdetails=1`
+        );
+        const data: NominatimResult[] = await res.json();
+        setSuggestions(data);
+        setShowSuggestions(true);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+  }
+
+  function pickSuggestion(r: NominatimResult) {
+    const name = cityNameFrom(r);
+    setSelectedCity({ name, lat: parseFloat(r.lat), lon: parseFloat(r.lon) });
+    setCityInput(name);
+    setSuggestions([]);
+    setShowSuggestions(false);
+  }
 
   function submit(ev: React.FormEvent) {
     ev.preventDefault();
@@ -56,11 +100,11 @@ function LogDate() {
     }
     if (!activity) return toast.error("Pick an activity.");
     if (!amount || isNaN(+amount)) return toast.error("Enter an amount.");
-    if (!partner.trim()) return toast.error("Add a partner display name.");
+    if (!partner.trim()) return toast.error("Add a partner first name.");
+    if (!cityInput.trim()) return toast.error("Enter a city.");
     if (!mood) return toast.error("Pick an overall vibe.");
     const pii = detectPII(partner);
-    if (pii) return toast.error(`Looks like you included a ${pii}. Use a nickname only.`);
-    const profile = getProfile();
+    if (pii) return toast.error(`Looks like you included a ${pii}. Use a first name only.`);
     addEntry({
       id: Math.random().toString(36).slice(2),
       userId: getUserId(),
@@ -71,7 +115,9 @@ function LogDate() {
       mood,
       meetVia: meet,
       secondDate: second,
-      city,
+      city: selectedCity?.name ?? cityInput.trim(),
+      lat: selectedCity?.lat,
+      lon: selectedCity?.lon,
       entryDate: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     });
@@ -111,9 +157,43 @@ function LogDate() {
         </Field>
 
         <Field label="City (where did the date happen?)" required>
-          <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40">
-            {ALL_CITIES.map((c) => <option key={c}>{c}</option>)}
-          </select>
+          <div className="relative">
+            <input
+              value={cityInput}
+              onChange={(e) => handleCityChange(e.target.value)}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              placeholder="Search any city in the world..."
+              className="w-full rounded-xl bg-input border border-border px-4 py-3 pr-24 focus:outline-none focus:ring-2 focus:ring-ring/40"
+            />
+            {searching && (
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">searching…</span>
+            )}
+            {!searching && selectedCity && (
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-green-500 font-medium">📍 on map</span>
+            )}
+            {showSuggestions && suggestions.length > 0 && (
+              <ul className="absolute z-20 w-full mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden">
+                {suggestions.map((r) => (
+                  <li key={r.place_id}>
+                    <button
+                      type="button"
+                      onMouseDown={() => pickSuggestion(r)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-muted transition"
+                    >
+                      <div className="text-sm font-medium">{cityNameFrom(r)}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {[r.address.state, r.address.country].filter(Boolean).join(", ")}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {!selectedCity && cityInput.length > 1 && !searching && (
+            <p className="text-xs text-muted-foreground mt-1.5">Pick a suggestion above to pin this date on your map</p>
+          )}
         </Field>
 
         <Field label="How did you meet?" optional>
