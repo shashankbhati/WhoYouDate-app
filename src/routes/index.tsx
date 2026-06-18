@@ -14,8 +14,8 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "WhoAmIDating — Home" },
-      { name: "description", content: "Anonymous dating analytics community. See what people spend, where they meet, and how it goes." },
+      { title: "whoami — The Community Ledger" },
+      { name: "description", content: "An anonymous ledger of modern dating. No real names. No phone numbers. No apps tracking you back." },
     ],
   }),
   component: Home,
@@ -71,7 +71,8 @@ function Home() {
   const [costliestGender, setCostliestGender] = useState<"all" | "f" | "m">("all");
   const [trendingGender, setTrendingGender] = useState<"all" | "f" | "m">("all");
   const [partnerMetric, setPartnerMetric] = useState<"cost" | "happy" | "dates">("cost");
-  const [tab, setTab] = useState<"feed" | "lookup" | "hot" | "new" | "top">("hot");
+  const [tab, setTab] = useState<"feed" | "lookup">("feed");
+  const [feedSort, setFeedSort] = useState<"hot" | "new" | "top">("hot");
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLInputElement>(null);
 
@@ -141,29 +142,50 @@ function Home() {
 
   const visiblePosts = useMemo(() => {
     const arr = [...posts];
-    if (tab === "new") arr.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-    else if (tab === "top") arr.sort((a, b) => b.upvotes - a.upvotes);
+    if (feedSort === "new") arr.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    else if (feedSort === "top") arr.sort((a, b) => b.upvotes - a.upvotes);
     else arr.sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes));
     return arr;
-  }, [posts, tab]);
+  }, [posts, feedSort]);
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-6">
-      {/* Banner + header */}
-      <section className="rounded-2xl overflow-hidden border border-border bg-card">
-        <div className="h-24" style={{ background: "var(--gradient-banner)" }} />
-        <div className="flex items-center justify-between gap-4 p-5 -mt-10">
-          <div className="flex items-end gap-4">
-            <div className="h-20 w-20 rounded-full bg-primary grid place-items-center text-2xl font-bold text-primary-foreground ring-4 ring-background">D</div>
-            <div className="pb-1">
-              <h1 className="text-2xl font-bold">r/WhoAmIDating</h1>
-              <p className="text-sm text-muted-foreground">who are you even spending money on 👀</p>
-            </div>
-          </div>
+      {/* Hero */}
+      <section className="py-8 sm:py-12">
+        <p className="text-xs font-semibold tracking-widest text-primary mb-5">VOL. 01 —— THE COMMUNITY LEDGER</p>
+        <h1 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
+          An anonymous ledger of <em>modern dating</em>.
+        </h1>
+        <p className="mt-4 text-muted-foreground max-w-xl leading-relaxed">
+          No real names. No phone numbers. No apps tracking you back. Just a quiet, open record of what dating actually looks like — what it costs, how it feels, and what people are learning from it.
+        </p>
+        <div className="flex items-center gap-3 mt-6 flex-wrap">
           <Link to="/log" className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-5 py-2.5 font-semibold text-sm hover:opacity-90 transition">
-            <Plus className="h-4 w-4" /> Log a Date
+            Log an entry
           </Link>
+          <Link to="/privacy" className="inline-flex items-center gap-2 rounded-full border border-border text-foreground px-5 py-2.5 font-semibold text-sm hover:bg-muted transition">
+            How anonymity works
+          </Link>
+          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <span className="inline-block h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            {totalEntries} reading right now
+          </span>
         </div>
+      </section>
+
+      {/* Feature cards */}
+      <section className="grid gap-px bg-border border border-border rounded-2xl overflow-hidden md:grid-cols-3 mb-6">
+        {[
+          { num: "01", title: "Log anonymously", desc: "An auto-generated handle, no email, no signup. Stored locally on your device." },
+          { num: "02", title: "We scrub PII", desc: "Names, numbers, addresses, and handles are detected and rejected at entry." },
+          { num: "03", title: "The community learns", desc: "Aggregated, never identifying. Stats under 25 entries are flagged as thin." },
+        ].map((f) => (
+          <div key={f.num} className="bg-card p-5">
+            <span className="text-xs text-muted-foreground font-medium">{f.num}</span>
+            <h3 className="font-semibold mt-2 mb-1">{f.title}</h3>
+            <p className="text-sm text-muted-foreground">{f.desc}</p>
+          </div>
+        ))}
       </section>
 
       {/* Country selector */}
@@ -260,8 +282,8 @@ function Home() {
         <div>
           {/* Tabs */}
           <div className="flex flex-wrap items-center gap-1 rounded-2xl border border-border bg-card p-2 mb-4">
-            {[["feed", "🗂️ Feed"], ["lookup", "🔍 Name Lookup"], ["hot", "🔥 Hot"], ["new", "✨ New"], ["top", "📈 Top"]].map(([k, l]) => (
-              <button key={k} onClick={() => setTab(k as typeof tab)} className={`px-4 py-2 rounded-md text-sm font-medium transition ${tab === k ? (k === "hot" ? "bg-primary/20 text-primary" : "bg-muted text-foreground") : "text-muted-foreground hover:text-foreground"}`}>{l}</button>
+            {([["feed", "Feed"], ["lookup", "Name Lookup"]] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setTab(k)} className={`px-4 py-2 rounded-md text-sm font-medium transition ${tab === k ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{l}</button>
             ))}
           </div>
 
@@ -276,7 +298,7 @@ function Home() {
               <div className="rounded-2xl border border-border bg-card p-3 mb-4">
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 rounded-full bg-muted grid place-items-center shrink-0">👤</div>
-                  <input ref={composerRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitPost()} placeholder="was ist auf deinem date passiert... 👀" className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none min-w-0" />
+                  <input ref={composerRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitPost()} placeholder="what happened on your date..." className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none min-w-0" />
                   <button onClick={submitPost} className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-primary-foreground grid place-items-center transition shrink-0"><Plus className="h-4 w-4" /></button>
                 </div>
                 <div className="flex gap-1 mt-2 pl-12 flex-wrap">
@@ -314,35 +336,34 @@ function Home() {
 
         {/* Sidebar */}
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-border bg-card overflow-hidden">
-            <div className="h-16" style={{ background: "var(--gradient-banner)" }} />
-            <div className="p-5">
-              <h3 className="font-bold">About r/WhoAmIDating</h3>
-              <p className="text-sm text-muted-foreground mt-2">track what you spend on dates. see who's trending in your city. stay completely anon — no real names, no data sold.</p>
-              <p className="text-xs text-muted-foreground/60 mt-3 mb-1">Community totals</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div><div className="text-xl font-bold">{totalEntries}</div><div className="text-xs text-muted-foreground">Dates logged</div></div>
-                <div><div className="text-xl font-bold">{posts.length}</div><div className="text-xs text-muted-foreground">Posts</div></div>
-                <div><div className="text-xl font-bold">{spentLabel}</div><div className="text-xs text-muted-foreground">Total spent</div></div>
-                <div><div className="text-xl font-bold">{avgMood.toFixed(1)} / 5</div><div className="text-xs text-muted-foreground">Avg mood</div></div>
-              </div>
-              <Link to="/log" className="mt-5 block text-center rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-semibold hover:opacity-90">Log a Date</Link>
-              <button onClick={() => { composerRef.current?.focus(); composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }} className="mt-2 w-full rounded-full border border-primary text-primary py-2.5 text-sm font-semibold hover:bg-primary/10">Create Post</button>
-            </div>
-          </div>
-
           <div className="rounded-2xl border border-border bg-card p-5">
-            <h3 className="text-xs font-bold tracking-wider mb-3">COMMUNITY RULES</h3>
-            <ol className="space-y-2 text-sm">
-              {["keine echten namen. nicknames only.", "what happens here stays here 🤐", "kein talk-shit über dates. be cool.", "zahlen > feelings (aber feelings auch ok)", "kein spam kein selbstpromo danke"].map((r, i) => (
-                <li key={i} className="flex gap-2"><span className="text-muted-foreground font-bold">{i + 1}.</span><span>{r}</span></li>
+            <h3 className="text-xs font-bold tracking-widest text-muted-foreground mb-3">SORT</h3>
+            <div className="space-y-1">
+              {([["hot", "Hot"], ["new", "New"], ["top", "Top"]] as const).map(([k, l]) => (
+                <button key={k} onClick={() => setFeedSort(k)} className={`block w-full text-left px-2 py-1 text-sm rounded transition ${feedSort === k ? "text-primary font-semibold" : "text-foreground hover:text-primary"}`}>{l}</button>
               ))}
-            </ol>
+              <span className="block px-2 py-1 text-sm text-muted-foreground">Rising</span>
+            </div>
+
+            <h3 className="text-xs font-bold tracking-widest text-muted-foreground mt-5 mb-3">TOPICS</h3>
+            <div className="space-y-1">
+              {(["All entries", "first dates", "red flags", "wins", "ghosted", "split the bill", "advice"] as const).map((l, i) => (
+                <button key={l} className={`flex items-center gap-2 w-full text-left px-2 py-1 text-sm rounded transition ${i === 0 ? "text-primary font-semibold" : "text-foreground hover:text-primary"}`}>
+                  <span className="text-muted-foreground">#</span>{l}
+                </button>
+              ))}
+            </div>
+
+            <h3 className="text-xs font-bold tracking-widest text-muted-foreground mt-5 mb-3">YOU</h3>
+            <div className="space-y-1">
+              <Link to="/stats" className="block px-2 py-1 text-sm text-foreground hover:text-primary transition">Your ledger</Link>
+              <Link to="/profile" className="block px-2 py-1 text-sm text-foreground hover:text-primary transition">Profile &amp; badges</Link>
+            </div>
           </div>
 
           {trendingActivity && (
             <div className="rounded-2xl border border-border bg-card p-5">
-              <h3 className="text-xs font-bold tracking-wider mb-3">TRENDING ACTIVITY</h3>
+              <h3 className="text-xs font-bold tracking-widest text-muted-foreground mb-3">TRENDING ACTIVITY</h3>
               <div className="flex items-center gap-2"><Flame className="h-4 w-4 text-primary" /><span className="font-bold">{trendingActivity.label}</span><span className="text-muted-foreground text-sm">({trendingActivity.count} logs)</span></div>
             </div>
           )}
@@ -350,7 +371,7 @@ function Home() {
           <LiveFeed entries={displayEntries} />
 
           <p className="text-xs text-muted-foreground text-center pb-2">
-            <Link to="/privacy" className="hover:text-foreground transition">Privacy Policy</Link>
+            <Link to="/privacy" className="hover:text-foreground transition">Privacy &amp; data</Link>
             {" · "}Anonymous by design
           </p>
         </aside>

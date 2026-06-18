@@ -20,11 +20,10 @@ function markSeen() {
 }
 
 const nav = [
-  { to: "/", label: "HOME" },
-  { to: "/stats", label: "STATS" },
-  { to: "/log", label: "LOG" },
-  { to: "/profile", label: "PROFILE" },
-  { to: "/settings", label: "SETTINGS" },
+  { to: "/", label: "Feed" },
+  { to: "/stats", label: "Your ledger" },
+  { to: "/log", label: "Log entry" },
+  { to: "/profile", label: "Profile" },
 ] as const;
 
 export function Header() {
@@ -67,13 +66,12 @@ export function Header() {
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
         <Link to="/" className="flex items-center gap-2 shrink-0" onClick={() => setMobileOpen(false)}>
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-primary text-primary-foreground font-bold text-sm">D</span>
-          <span className="font-bold tracking-tight text-foreground hidden sm:block">WhoAmIDating</span>
+          <span className="font-bold tracking-tight text-foreground">whoamidating.singles</span>
         </Link>
 
         <div className="relative flex-1 max-w-md mx-auto hidden md:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input className="w-full rounded-full bg-input/70 border border-border pl-10 pr-4 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40" placeholder="Search communities..." />
+          <input className="w-full rounded-full bg-input/70 border border-border pl-10 pr-4 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40" placeholder="Search the ledger..." />
         </div>
 
         {/* Desktop nav */}
@@ -153,7 +151,7 @@ export function Header() {
         {/* Mobile: Log CTA + hamburger */}
         <div className="flex items-center gap-2 ml-auto md:hidden">
           <Link to="/log" className="rounded-full bg-primary text-primary-foreground text-xs font-bold px-3 py-1.5 hover:opacity-90 transition">
-            + Log
+            + Log entry
           </Link>
           <button onClick={() => setMobileOpen(!mobileOpen)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground">
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

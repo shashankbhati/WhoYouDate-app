@@ -83,16 +83,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "WhoAmIDating — Anonymous Dating Analytics" },
-      { name: "description", content: "Log your dates anonymously, see trends, compare without sharing who you are." },
-      { name: "author", content: "WhoAmIDating" },
-      { property: "og:title", content: "WhoAmIDating — Anonymous Dating Analytics" },
-      { property: "og:description", content: "Log your dates anonymously, see trends, compare without sharing who you are." },
+      { title: "whoami — Anonymous Dating Ledger" },
+      { name: "description", content: "An anonymous ledger of modern dating. No real names. No phone numbers. No apps tracking you back." },
+      { name: "author", content: "whoami" },
+      { property: "og:title", content: "whoami — Anonymous Dating Ledger" },
+      { property: "og:description", content: "An anonymous ledger of modern dating. No real names. No phone numbers. No apps tracking you back." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "WhoAmIDating — Anonymous Dating Analytics" },
-      { name: "twitter:description", content: "Log your dates anonymously, see trends, compare without sharing who you are." },
+      { name: "twitter:site", content: "@whoamidating" },
+      { name: "twitter:title", content: "whoami — Anonymous Dating Ledger" },
+      { name: "twitter:description", content: "An anonymous ledger of modern dating. No real names. No phone numbers. No apps tracking you back." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b36138f3-1977-4255-a689-253906a7d5ef/id-preview-bc380d38--cb4d77ac-7f23-46df-84df-d3a2282e1fec.lovable.app-1780072729691.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b36138f3-1977-4255-a689-253906a7d5ef/id-preview-bc380d38--cb4d77ac-7f23-46df-84df-d3a2282e1fec.lovable.app-1780072729691.png" },
     ],
@@ -123,6 +123,48 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function Footer() {
+  return (
+    <footer className="border-t border-border mt-12">
+      <div className="mx-auto max-w-7xl px-4 py-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <span className="font-bold text-foreground">whoami</span>
+          <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
+            An anonymous ledger of modern dating. No names. No numbers. No apps tracking you back.
+          </p>
+        </div>
+        <div>
+          <h4 className="text-xs font-bold tracking-widest text-muted-foreground mb-4">THE PROJECT</h4>
+          <ul className="space-y-2 text-sm">
+            <li><Link to="/privacy" className="text-foreground hover:text-primary transition">About</Link></li>
+            <li><Link to="/privacy" className="text-foreground hover:text-primary transition">How anonymity works</Link></li>
+            <li><Link to="/privacy" className="text-foreground hover:text-primary transition">Privacy &amp; data</Link></li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="text-xs font-bold tracking-widest text-muted-foreground mb-4">COMMUNITY</h4>
+          <ul className="space-y-2 text-sm">
+            <li><Link to="/" className="text-foreground hover:text-primary transition">Feed</Link></li>
+            <li><Link to="/stats" className="text-foreground hover:text-primary transition">Your ledger</Link></li>
+            <li><Link to="/log" className="text-foreground hover:text-primary transition">Log an entry</Link></li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="text-xs font-bold tracking-widest text-muted-foreground mb-4">METHODOLOGY</h4>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Every stat on this site is derived from the open community ledger. Numbers below ~25 entries are marked <em>thin sample</em>. Personally identifying inputs are scrubbed at entry time.
+          </p>
+        </div>
+      </div>
+      <div className="border-t border-border">
+        <p className="mx-auto max-w-7xl px-4 py-4 text-xs text-muted-foreground text-center">
+          © 2026 whoami · est. a quiet corner of the internet
+        </p>
+      </div>
+    </footer>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const { isReal, modal } = useAuthState();
@@ -144,6 +186,7 @@ function RootComponent() {
       <div className="min-h-screen bg-background text-foreground">
         <Header />
         <Outlet />
+        <Footer />
         <Toaster />
         <AuthModal open={modal.open} message={modal.message} />
         <UsernameSetup open={showUsernameSetup} onDone={() => setShowUsernameSetup(false)} />
