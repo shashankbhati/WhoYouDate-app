@@ -298,7 +298,7 @@ function Home() {
 
           {tab === "lookup" ? (
             <div className="space-y-4">
-              <NameAnalyticsPanel entries={displayEntries} currency={config.defaultCurrency} featuredNames={FEATURED_NAMES[country]} />
+              <NameAnalyticsPanel entries={entries} currency={config.defaultCurrency} featuredNames={FEATURED_NAMES[country]} />
               <CityHotspotsPanel entries={displayEntries} />
               <CityComparisonPanel entries={displayEntries} config={config} />
             </div>
@@ -650,37 +650,95 @@ const MEET_LABELS: Record<string, string> = {
   work_school: "Work/School", in_person: "IRL", other_app: "Other App",
 };
 
+// City → country code lookup for fallback cascade
+const CITY_COUNTRY: Record<string, string> = {
+  Berlin: "DE", Munich: "DE", Hamburg: "DE", Cologne: "DE", Frankfurt: "DE", Dresden: "DE",
+  Delhi: "IN", Mumbai: "IN", Bangalore: "IN", Hyderabad: "IN", Pune: "IN", Chennai: "IN",
+  "New York": "US", "Los Angeles": "US", Chicago: "US", Austin: "US", Miami: "US",
+};
+const COUNTRY_NAMES: Record<string, string> = { DE: "Germany", IN: "India", US: "United States" };
+// Units of each currency per 1 EUR (approximate — labeled with ~ on display)
+const RATES_PER_EUR: Record<string, number> = { EUR: 1, USD: 1.08, INR: 89, GBP: 0.86, CHF: 0.96 };
+
+function convertCents(cents: number, from: string, to: string): number {
+  if (from === to) return cents;
+  return (cents / (RATES_PER_EUR[from] ?? 1)) * (RATES_PER_EUR[to] ?? 1);
+}
+
 function NameAnalyticsPanel({ entries, currency, featuredNames }: { entries: ReturnType<typeof useStore>["entries"]; currency: string; featuredNames: string[] }) {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
+  const [cityInput, setCityInput] = useState("");
+  const [cityQuery, setCityQuery] = useState("");
+
+  // Derive popular cities from all entries for chips
+  const popularCities = useMemo(() => {
+    const map: Record<string, number> = {};
+    entries.forEach((e) => { map[e.city] = (map[e.city] ?? 0) + 1; });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c]) => c);
+  }, [entries]);
 
   const analytics = useMemo(() => {
     if (!query) return null;
-    const m = entries.filter((e) => e.partnerName.toLowerCase() === query.toLowerCase());
-    if (m.length < 3) return { insufficient: true as const, count: m.length };
 
-    const count = m.length;
-    const avgSpend = m.reduce((a, e) => a + e.amountCents, 0) / count;
-    const happyRate = m.filter((e) => e.mood >= 4).length / count;
-    const secondDateRate = m.filter((e) => e.secondDate !== "no").length / count;
-    const avgMood = m.reduce((a, e) => a + e.mood, 0) / count;
+    // All global matches for this name
+    const nameMatches = entries.filter((e) => e.partnerName.toLowerCase() === query.toLowerCase());
+
+    let useEntries = nameMatches;
+    let scope: { type: "city"; label: string } | { type: "country"; label: string; cityCount: number; cityName: string } | { type: "global"; cityCount?: number; cityName?: string } = { type: "global" };
+
+    if (cityQuery) {
+      const cityMatches = nameMatches.filter((e) => e.city.toLowerCase() === cityQuery.toLowerCase());
+      if (cityMatches.length >= 20) {
+        useEntries = cityMatches;
+        scope = { type: "city", label: cityQuery };
+      } else {
+        // Determine country from city name, then fall back to country-level
+        const countryCode = CITY_COUNTRY[cityQuery] ?? Object.keys(CITY_COUNTRY).find((c) => c.toLowerCase() === cityQuery.toLowerCase() && CITY_COUNTRY[c]);
+        if (countryCode) {
+          const countryMatches = nameMatches.filter((e) => CITY_COUNTRY[e.city] === countryCode);
+          if (countryMatches.length >= 20) {
+            useEntries = countryMatches;
+            scope = { type: "country", label: COUNTRY_NAMES[countryCode] ?? countryCode, cityCount: cityMatches.length, cityName: cityQuery };
+          } else {
+            useEntries = nameMatches;
+            scope = { type: "global", cityCount: cityMatches.length, cityName: cityQuery };
+          }
+        } else {
+          useEntries = nameMatches;
+          scope = { type: "global", cityCount: cityMatches.length, cityName: cityQuery };
+        }
+      }
+    }
+
+    if (useEntries.length < 3) return { insufficient: true as const, count: nameMatches.length, scope };
+
+    const count = useEntries.length;
+    // Convert all amounts to viewer's currency; flag if cross-currency conversion happened
+    const hasMixedCurrencies = new Set(useEntries.map((e) => e.currency)).size > 1 || (useEntries[0]?.currency ?? currency) !== currency;
+    const totalConverted = useEntries.reduce((a, e) => a + convertCents(e.amountCents, e.currency, currency), 0);
+    const avgSpend = totalConverted / count;
+
+    const happyRate = useEntries.filter((e) => e.mood >= 4).length / count;
+    const secondDateRate = useEntries.filter((e) => e.secondDate !== "no").length / count;
+    const avgMood = useEntries.reduce((a, e) => a + e.mood, 0) / count;
 
     const cityMap: Record<string, number> = {};
-    m.forEach((e) => { cityMap[e.city] = (cityMap[e.city] ?? 0) + 1; });
-    const cities = Object.entries(cityMap).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value })).slice(0, 5);
+    useEntries.forEach((e) => { cityMap[e.city] = (cityMap[e.city] ?? 0) + 1; });
+    const cities = Object.entries(cityMap).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value })).slice(0, 6);
 
     const actMap: Record<string, number> = {};
-    m.forEach((e) => { actMap[e.activity] = (actMap[e.activity] ?? 0) + 1; });
+    useEntries.forEach((e) => { actMap[e.activity] = (actMap[e.activity] ?? 0) + 1; });
     const activities = Object.entries(actMap).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ name: ACTIVITY_META[k as keyof typeof ACTIVITY_META]?.label ?? k, value: v })).slice(0, 6);
 
     const meetMap: Record<string, number> = {};
-    m.forEach((e) => { if (e.meetVia) { meetMap[e.meetVia] = (meetMap[e.meetVia] ?? 0) + 1; } });
+    useEntries.forEach((e) => { if (e.meetVia) { meetMap[e.meetVia] = (meetMap[e.meetVia] ?? 0) + 1; } });
     const meetVias = Object.entries(meetMap).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ name: MEET_LABELS[k] ?? k, value: v })).slice(0, 5);
 
-    const moodDist = [1, 2, 3, 4, 5].map((mood) => ({ name: "★".repeat(mood), value: m.filter((e) => e.mood === mood).length }));
+    const moodDist = [1, 2, 3, 4, 5].map((mood) => ({ name: "★".repeat(mood), value: useEntries.filter((e) => e.mood === mood).length }));
 
-    return { insufficient: false as const, count, avgSpend, happyRate, secondDateRate, avgMood, cities, activities, meetVias, moodDist };
-  }, [entries, query]);
+    return { insufficient: false as const, count, avgSpend, happyRate, secondDateRate, avgMood, cities, activities, meetVias, moodDist, scope, hasMixedCurrencies };
+  }, [entries, query, cityQuery, currency]);
 
   function search(name: string) {
     const trimmed = name.trim();
@@ -688,11 +746,18 @@ function NameAnalyticsPanel({ entries, currency, featuredNames }: { entries: Ret
     setQuery(trimmed);
   }
 
+  function pickCity(c: string) {
+    setCityInput(c === cityQuery ? "" : c);
+    setCityQuery(c === cityQuery ? "" : c);
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-card p-4">
         <h2 className="text-xs font-bold tracking-wider mb-1">🔍 NAME ANALYTICS</h2>
-        <p className="text-xs text-muted-foreground mb-3">search a name. see what the community says. completely anon.</p>
+        <p className="text-xs text-muted-foreground mb-3">search any name globally — see what the community says. completely anon.</p>
+
+        {/* Name search */}
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -708,7 +773,28 @@ function NameAnalyticsPanel({ entries, currency, featuredNames }: { entries: Ret
             Search
           </button>
         </div>
-        <div className="flex flex-wrap gap-2 mt-3">
+
+        {/* City filter */}
+        <div className="mt-3">
+          <p className="text-xs text-muted-foreground mb-1.5">Filter by city <span className="opacity-60">(optional — shows city→country→global based on data)</span></p>
+          <input
+            value={cityInput}
+            onChange={(e) => { setCityInput(e.target.value); setCityQuery(e.target.value.trim()); }}
+            placeholder="e.g. Berlin, Delhi, New York..."
+            className="w-full rounded-full bg-input border border-border px-4 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+          />
+          {popularCities.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {popularCities.map((c) => (
+                <button key={c} onClick={() => pickCity(c)} className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition ${cityQuery.toLowerCase() === c.toLowerCase() ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{c}</button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Featured name chips */}
+        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
+          <span className="text-xs text-muted-foreground self-center">Popular:</span>
           {featuredNames.map((n) => (
             <button
               key={n}
@@ -724,28 +810,53 @@ function NameAnalyticsPanel({ entries, currency, featuredNames }: { entries: Ret
       {!query && (
         <div className="rounded-2xl border border-border bg-card p-12 text-center">
           <p className="text-3xl mb-3">🔍</p>
-          <p className="font-semibold">search a name above</p>
-          <p className="text-sm text-muted-foreground mt-1">oder tippe einen der namen unten an — was sagt die community?</p>
+          <p className="font-semibold">search any name above</p>
+          <p className="text-sm text-muted-foreground mt-1">results pull from the entire global ledger</p>
         </div>
       )}
 
       {query && analytics?.insufficient && (
         <div className="rounded-2xl border border-border bg-card p-10 text-center">
           <p className="text-muted-foreground text-sm">
-            Not enough data for <span className="font-semibold text-foreground">"{query}"</span> — need at least 3 entries.
+            Not enough data for <span className="font-semibold text-foreground">"{query}"</span>
+            {cityQuery ? ` (globally)` : ""} — need at least 3 entries. {analytics.count > 0 ? `Found ${analytics.count} so far.` : ""}
           </p>
         </div>
       )}
 
       {query && analytics && !analytics.insufficient && (
         <>
-          <div className="flex items-center gap-2 px-1">
-            <h3 className="font-bold text-lg">{query}</h3>
-            <span className="text-sm text-muted-foreground">— {analytics.count} dates logged</span>
+          <div className="flex items-start justify-between gap-2 px-1">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-lg">{query}</h3>
+                <span className="text-sm text-muted-foreground">— {analytics.count} dates</span>
+              </div>
+              {/* Scope banner */}
+              {analytics.scope.type === "city" && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">📍 Showing {analytics.scope.label}-only results</p>
+              )}
+              {analytics.scope.type === "country" && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                  Only {analytics.scope.cityCount} date{analytics.scope.cityCount !== 1 ? "s" : ""} in {analytics.scope.cityName} — showing {analytics.scope.label}-wide results
+                </p>
+              )}
+              {analytics.scope.type === "global" && analytics.scope.cityName && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Only {analytics.scope.cityCount} date{analytics.scope.cityCount !== 1 ? "s" : ""} in {analytics.scope.cityName} — showing global results
+                </p>
+              )}
+              {analytics.scope.type === "global" && !analytics.scope.cityName && (
+                <p className="text-xs text-muted-foreground mt-0.5">Global results</p>
+              )}
+            </div>
+            {analytics.hasMixedCurrencies && (
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full shrink-0 mt-0.5">~{currencySymbol(currency)} approx</span>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard label={`Avg ${currencySymbol(currency)}/date`} value={fmtAmount(analytics.avgSpend, currency)} />
+            <StatCard label={`Avg ${analytics.hasMixedCurrencies ? "~" : ""}${currencySymbol(currency)}/date`} value={fmtAmount(analytics.avgSpend, currency)} />
             <StatCard label="Happy rate" value={`${(analytics.happyRate * 100).toFixed(0)}%`} sub="mood 4 or 5" />
             <StatCard label="2nd date rate" value={`${(analytics.secondDateRate * 100).toFixed(0)}%`} />
             <StatCard label="Avg mood" value={`${analytics.avgMood.toFixed(1)} / 5`} />
