@@ -8,11 +8,13 @@ const CITIES = ["Berlin", "Munich", "Hamburg", "Cologne", "Frankfurt", "Dresden"
 // Export name sets so UI can categorize entries by gender
 export const FEMALE_NAMES_ALL = new Set([
   ...FEMALE_NAMES,
+  "Tabea",
   "Priya", "Neha", "Aditi", "Anjali", "Pooja", "Riya", "Sneha", "Ananya", "Kavya", "Divya", "Ishita", "Simran", "Nisha", "Ayesha", "Sana",
   "Ashley", "Jessica", "Emily", "Olivia", "Emma", "Megan", "Sarah", "Chloe", "Madison", "Brittany", "Taylor", "Amanda", "Lauren", "Kayla", "Samantha",
 ]);
 export const MALE_NAMES_ALL = new Set([
   ...MALE_NAMES,
+  "Shashank",
   "Rahul", "Amit", "Suresh", "Raj", "Dev", "Aarav", "Rohit", "Arjun", "Karan", "Aditya", "Akash", "Varun", "Nikhil", "Siddharth", "Vivek",
   "Tyler", "Ryan", "Jake", "Brandon", "Chase", "Noah", "Michael", "Chris", "Alex", "Josh", "Kevin", "Matt", "Derek", "Ethan", "Jordan",
 ]);
@@ -210,6 +212,41 @@ export function seedEntriesDresden(): Entry[] {
   for (let i = 0; i < 8; i++) {
     out.push({ id: uid(), userId: "seed_" + uid(), activity: "food_date", amountCents: 9500 + Math.floor(Math.random() * 3000), currency: "EUR", partnerName: "Moritz", mood: 3, meetVia: "friends", secondDate: Math.random() > 0.5 ? "yes" : "no", city: "Dresden", entryDate: new Date(now - i * 86400000 * 4).toISOString(), createdAt: new Date(now - i * 86400000 * 4).toISOString() });
   }
+  return out;
+}
+
+export function seedEntriesTabeaShashank(): Entry[] {
+  const out: Entry[] = [];
+  const now = Date.now();
+
+  // Tabea — German girl, Berlin/Hamburg heavy, Hinge meets, foodie + gifts, high spend, very high happy rate
+  for (let i = 0; i < 18; i++) {
+    const cities = ["Berlin", "Hamburg", "Berlin", "Berlin", "Munich", "Hamburg"];
+    const city = cities[i % cities.length];
+    const acts: Entry["activity"][] = ["food_date", "food_date", "gift", "trip", "coffee", "food_date"];
+    const activity = acts[i % acts.length];
+    const base = activity === "trip" ? 44000 : activity === "gift" ? 18000 : activity === "food_date" ? 11500 : 1400;
+    const amount = Math.max(800, Math.round(base * (0.75 + Math.random() * 0.6)));
+    const mood = (i < 12 ? weightedRand([3, 4, 5], [10, 40, 50]) : weightedRand([2, 3, 4], [20, 45, 35])) as Entry["mood"];
+    const sd: Entry["secondDate"] = mood >= 4 ? (Math.random() < 0.7 ? "yes" : "together") : "no";
+    const daysAgo = Math.floor(i * 6 + Math.random() * 5);
+    out.push({ id: uid(), userId: "seed_" + uid(), activity, amountCents: amount, currency: "EUR", partnerName: "Tabea", mood, meetVia: i % 3 === 0 ? "bumble" : "hinge", secondDate: sd, city, entryDate: new Date(now - daysAgo * 86400000).toISOString(), createdAt: new Date(now - daysAgo * 86400000).toISOString() });
+  }
+
+  // Shashank — Indian guy, Delhi/Mumbai/Bangalore, Tinder/Hinge, dinners + trips, mixed moods
+  for (let i = 0; i < 18; i++) {
+    const cities = ["Delhi", "Mumbai", "Delhi", "Bangalore", "Delhi", "Mumbai"];
+    const city = cities[i % cities.length];
+    const acts: Entry["activity"][] = ["food_date", "coffee", "food_date", "trip", "movie", "food_date"];
+    const activity = acts[i % acts.length];
+    const base = activity === "trip" ? 38000 : activity === "food_date" ? 4500 : activity === "movie" ? 1800 : 900;
+    const amount = Math.max(400, Math.round(base * (0.7 + Math.random() * 0.7)));
+    const mood = (i < 10 ? weightedRand([2, 3, 4, 5], [10, 30, 35, 25]) : weightedRand([1, 2, 3, 4], [15, 30, 35, 20])) as Entry["mood"];
+    const sd: Entry["secondDate"] = mood >= 4 ? "yes" : mood === 3 && Math.random() > 0.5 ? "yes" : "no";
+    const daysAgo = Math.floor(i * 5 + Math.random() * 4);
+    out.push({ id: uid(), userId: "seed_" + uid(), activity, amountCents: amount, currency: "INR", partnerName: "Shashank", mood, meetVia: i % 2 === 0 ? "tinder" : "hinge", secondDate: sd, city, entryDate: new Date(now - daysAgo * 86400000).toISOString(), createdAt: new Date(now - daysAgo * 86400000).toISOString() });
+  }
+
   return out;
 }
 

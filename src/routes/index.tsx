@@ -177,7 +177,7 @@ function Home() {
           </Link>
           <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <span className="inline-block h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            {totalEntries} reading right now
+            {totalEntries.toLocaleString()} dates in the ledger
           </span>
         </div>
       </section>
