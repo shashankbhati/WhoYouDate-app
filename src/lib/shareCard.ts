@@ -168,7 +168,123 @@ export function shareTrendingCard(
     `see who's trending on dates 👀 whoamidating.singles`);
 }
 
-// ── 3. Personal stats card ────────────────────────────────────────────────────
+// ── 3. Name analytics result card ────────────────────────────────────────────
+
+export interface NameCardStats {
+  name: string;
+  count: number;
+  avgSpend: number;          // minor currency units, already converted to viewer currency
+  happyRate: number;         // 0–1
+  secondDateRate: number;    // 0–1
+  avgMood: number;           // 1–5
+  currencySymbol: string;
+  approx: boolean;           // true when cross-currency conversion was applied
+  scopeLabel: string;        // e.g. "Berlin", "Germany-wide", "Global"
+  topActivities: { name: string; value: number }[];
+  topCities: { name: string; value: number }[];
+}
+
+export function shareNameCard(stats: NameCardStats) {
+  const W = 1080, H = 1080;
+  const { canvas, ctx } = makeCanvas(W, H);
+  drawBackground(ctx, W, H);
+
+  // Header label
+  ctx.fillStyle = "#e05533";
+  ctx.font = `bold 36px -apple-system,'Segoe UI',sans-serif`;
+  ctx.fillText("SEARCHED ON WHOAMIDATING", 80, 100);
+
+  // Big name
+  let nameFontSize = 140;
+  ctx.font = `bold ${nameFontSize}px -apple-system,'Segoe UI',sans-serif`;
+  while (ctx.measureText(stats.name).width > W - 160 && nameFontSize > 70) {
+    nameFontSize -= 8;
+    ctx.font = `bold ${nameFontSize}px -apple-system,'Segoe UI',sans-serif`;
+  }
+  ctx.fillStyle = "#f0eef8";
+  ctx.fillText(stats.name, 80, 100 + nameFontSize);
+
+  // Sub line: count + scope
+  const subY = 100 + nameFontSize + 48;
+  ctx.fillStyle = "#6b6890";
+  ctx.font = `28px -apple-system,'Segoe UI',sans-serif`;
+  ctx.fillText(`${stats.count} dates logged  ·  ${stats.scopeLabel}`, 80, subY);
+
+  // Divider
+  ctx.strokeStyle = "rgba(255,255,255,0.07)";
+  ctx.lineWidth = 1;
+  const divY = subY + 32;
+  ctx.beginPath(); ctx.moveTo(80, divY); ctx.lineTo(W - 80, divY); ctx.stroke();
+
+  // 4-stat grid
+  const sym = stats.approx ? `~${stats.currencySymbol}` : stats.currencySymbol;
+  const statItems = [
+    { label: `avg ${sym}/date`, value: `${sym}${(stats.avgSpend / 100).toFixed(0)}` },
+    { label: "happy rate",      value: `${(stats.happyRate * 100).toFixed(0)}%` },
+    { label: "2nd date",        value: `${(stats.secondDateRate * 100).toFixed(0)}%` },
+    { label: "avg mood",        value: `${stats.avgMood.toFixed(1)}/5` },
+  ];
+  const gridTop = divY + 24;
+  const colW = (W - 160) / 4;
+  statItems.forEach((s, i) => {
+    const x = 80 + i * colW;
+    ctx.fillStyle = "rgba(255,255,255,0.04)";
+    ctx.beginPath(); ctx.roundRect(x + 6, gridTop, colW - 12, 130, 14); ctx.fill();
+    ctx.fillStyle = "#f0eef8";
+    ctx.font = `bold 48px -apple-system,'Segoe UI',sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(s.value, x + colW / 2, gridTop + 66);
+    ctx.fillStyle = "#6b6890";
+    ctx.font = `22px -apple-system,'Segoe UI',sans-serif`;
+    ctx.fillText(s.label, x + colW / 2, gridTop + 100);
+    ctx.textAlign = "left";
+  });
+
+  // Activity bars (top 6)
+  const barsTop = gridTop + 160;
+  ctx.fillStyle = "#9996bb";
+  ctx.font = `22px -apple-system,'Segoe UI',sans-serif`;
+  ctx.fillText("TOP ACTIVITIES", 80, barsTop - 10);
+
+  const activities = stats.topActivities.slice(0, 6);
+  if (activities.length > 0) {
+    drawBars(ctx, activities, {
+      left: 80, top: barsTop + 8, width: W - 160, height: 220,
+      formatVal: (v) => String(v),
+    });
+  }
+
+  // Top cities strip
+  const citiesTop = barsTop + 8 + 220 + 76;
+  const topCities = stats.topCities.slice(0, 5);
+  if (topCities.length > 0) {
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.beginPath(); ctx.moveTo(80, citiesTop - 12); ctx.lineTo(W - 80, citiesTop - 12); ctx.stroke();
+    ctx.fillStyle = "#9996bb";
+    ctx.font = `22px -apple-system,'Segoe UI',sans-serif`;
+    ctx.fillText("MOST DATED IN", 80, citiesTop + 14);
+    const chipX = 80 + ctx.measureText("MOST DATED IN  ").width;
+    let cx = chipX;
+    topCities.forEach(({ name }) => {
+      const tw = ctx.measureText(name).width;
+      ctx.fillStyle = "rgba(224,85,51,0.18)";
+      ctx.beginPath(); ctx.roundRect(cx, citiesTop - 4, tw + 28, 32, 8); ctx.fill();
+      ctx.fillStyle = "#e05533";
+      ctx.font = `bold 22px -apple-system,'Segoe UI',sans-serif`;
+      ctx.fillText(name, cx + 14, citiesTop + 18);
+      cx += tw + 44;
+    });
+  }
+
+  drawFooter(ctx, W, H, "search your name too");
+  shareOrDownload(
+    canvas,
+    `whoamidating-${stats.name.toLowerCase().replace(/\s+/g, "-")}.png`,
+    `i looked up "${stats.name}" on this anonymous dating site 👀 whoamidating.singles`
+  );
+}
+
+// ── 4. Personal stats card ────────────────────────────────────────────────────
 
 export interface PersonalStats {
   username: string;

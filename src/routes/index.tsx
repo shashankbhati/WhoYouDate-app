@@ -8,7 +8,7 @@ import { isRealUser, openAuthModal } from "@/lib/auth";
 import { useCountry, setCountry } from "@/lib/country";
 import { COUNTRY_CONFIG, fmtAmount, currencySymbol, type CountryCode } from "@/lib/datedata/countries";
 import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react";
-import { shareCard, shareTrendingCard } from "@/lib/shareCard";
+import { shareCard, shareTrendingCard, shareNameCard } from "@/lib/shareCard";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -850,9 +850,29 @@ function NameAnalyticsPanel({ entries, currency, featuredNames }: { entries: Ret
                 <p className="text-xs text-muted-foreground mt-0.5">Global results</p>
               )}
             </div>
-            {analytics.hasMixedCurrencies && (
-              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full shrink-0 mt-0.5">~{currencySymbol(currency)} approx</span>
-            )}
+            <div className="flex items-center gap-2 shrink-0 mt-0.5">
+              {analytics.hasMixedCurrencies && (
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">~{currencySymbol(currency)} approx</span>
+              )}
+              <button
+                onClick={() => shareNameCard({
+                  name: query,
+                  count: analytics.count,
+                  avgSpend: analytics.avgSpend,
+                  happyRate: analytics.happyRate,
+                  secondDateRate: analytics.secondDateRate,
+                  avgMood: analytics.avgMood,
+                  currencySymbol: currencySymbol(currency),
+                  approx: analytics.hasMixedCurrencies,
+                  scopeLabel: analytics.scope.type === "city" ? analytics.scope.label : analytics.scope.type === "country" ? `${analytics.scope.label}-wide` : "Global",
+                  topActivities: analytics.activities,
+                  topCities: analytics.cities,
+                })}
+                className="flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-4 py-1.5 text-xs font-semibold hover:opacity-90 transition"
+              >
+                <Share2 className="h-3.5 w-3.5" /> Share
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
