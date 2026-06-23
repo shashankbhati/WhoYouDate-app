@@ -1,2 +1,3 @@
 User-agent: *
 Allow: /
+Sitemap: https://whoamidating.singles/sitemap.xml

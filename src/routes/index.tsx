@@ -14,8 +14,9 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "whoami — The Community Ledger" },
-      { name: "description", content: "An anonymous ledger of modern dating. No real names. No phone numbers. No apps tracking you back." },
+      { title: "WhoAmIDating — Dating Costs, Reviews & Community Ledger" },
+      { name: "description", content: "How much do people spend on dates in Berlin, Delhi, New York? Search any name to see real anonymous dating data. Community feed, city comparisons, and more." },
+      { name: "keywords", content: "dating cost tracker, how much does a date cost, dating in Berlin, dating in Delhi, dating expenses, anonymous dating app, date cost India, date cost Germany" },
     ],
   }),
   component: Home,

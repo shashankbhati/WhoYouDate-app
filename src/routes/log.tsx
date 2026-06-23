@@ -10,8 +10,8 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/log")({
   head: () => ({
     meta: [
-      { title: "Log a Date — WhoAmIDating" },
-      { name: "description", content: "Record a dating activity anonymously. Display names only — no PII." },
+      { title: "Log a Date — Track Your Dating Expenses Anonymously | WhoAmIDating" },
+      { name: "description", content: "Log your date anonymously — what you spent, where you went, your mood, and whether you'd go again. No personal data. Contribute to real dating cost statistics." },
     ],
   }),
   component: LogDate,

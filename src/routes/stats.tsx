@@ -11,8 +11,8 @@ import { sharePersonalCard } from "@/lib/shareCard";
 export const Route = createFileRoute("/stats")({
   head: () => ({
     meta: [
-      { title: "Your Dashboard — WhoAmIDating" },
-      { name: "description", content: "Your anonymous dating stats: entries, spend, mood, badges, and platform trends." },
+      { title: "My Dating Stats — WhoAmIDating" },
+      { name: "description", content: "Your personal anonymous dating dashboard. Track spending, mood trends, partner history, and see where you've been on dates on the map." },
     ],
   }),
   component: Stats,

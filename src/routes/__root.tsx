@@ -10,7 +10,6 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { Analytics } from "@vercel/analytics/react";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Header } from "../components/datedata/Header";
 import { Toaster } from "../components/ui/sonner";
@@ -84,16 +83,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "whoami — Anonymous Dating Ledger" },
-      { name: "description", content: "An anonymous ledger of modern dating. No real names. No phone numbers. No apps tracking you back." },
-      { name: "author", content: "whoami" },
-      { property: "og:title", content: "whoami — Anonymous Dating Ledger" },
-      { property: "og:description", content: "An anonymous ledger of modern dating. No real names. No phone numbers. No apps tracking you back." },
+      { title: "WhoAmIDating — Anonymous Dating Cost Tracker & Community Ledger" },
+      { name: "description", content: "See how much people really spend on dates in Berlin, Delhi, New York and more. Search any name, track your own dates anonymously. Real data from real people." },
+      { name: "keywords", content: "dating cost, how much does dating cost, dating expenses, date tracker, anonymous dating, dating in Berlin, dating in Delhi, dating ledger, dating statistics" },
+      { name: "author", content: "WhoAmIDating" },
+      { property: "og:title", content: "WhoAmIDating — How Much Does Dating Really Cost?" },
+      { property: "og:description", content: "Anonymous community ledger of real dating costs. Search any name. See what people spend on dates in your city." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@whoamidating" },
-      { name: "twitter:title", content: "whoami — Anonymous Dating Ledger" },
-      { name: "twitter:description", content: "An anonymous ledger of modern dating. No real names. No phone numbers. No apps tracking you back." },
+      { name: "twitter:title", content: "WhoAmIDating — How Much Does Dating Really Cost?" },
+      { name: "twitter:description", content: "Anonymous community ledger of real dating costs. Search any name. See what people spend on dates in your city." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b36138f3-1977-4255-a689-253906a7d5ef/id-preview-bc380d38--cb4d77ac-7f23-46df-84df-d3a2282e1fec.lovable.app-1780072729691.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b36138f3-1977-4255-a689-253906a7d5ef/id-preview-bc380d38--cb4d77ac-7f23-46df-84df-d3a2282e1fec.lovable.app-1780072729691.png" },
     ],
@@ -110,11 +110,25 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+const GA_ID = import.meta.env.VITE_GA_ID as string | undefined;
+const CLARITY_ID = import.meta.env.VITE_CLARITY_ID as string | undefined;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
         <HeadContent />
+        {/* Google Analytics 4 */}
+        {GA_ID && (
+          <>
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} />
+            <script dangerouslySetInnerHTML={{ __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');` }} />
+          </>
+        )}
+        {/* Microsoft Clarity */}
+        {CLARITY_ID && (
+          <script dangerouslySetInnerHTML={{ __html: `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${CLARITY_ID}");` }} />
+        )}
       </head>
       <body>
         {children}
@@ -191,7 +205,6 @@ function RootComponent() {
         <Toaster />
         <AuthModal open={modal.open} message={modal.message} />
         <UsernameSetup open={showUsernameSetup} onDone={() => setShowUsernameSetup(false)} />
-        <Analytics />
       </div>
     </QueryClientProvider>
   );
