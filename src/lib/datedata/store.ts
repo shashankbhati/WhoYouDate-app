@@ -115,10 +115,32 @@ function entryToRow(e: Entry) {
   };
 }
 
+// ── Static client-side seed (shown instantly to all visitors, even before DB loads) ──
+function buildStaticSeed(): { entries: Entry[]; posts: Post[] } {
+  const entries = [
+    ...seedEntries(),
+    ...seedEntriesIndia(),
+    ...seedEntriesUS(),
+    ...seedEntriesDresden(),
+    ...seedEntriesTabeaShashank(),
+  ];
+  const posts = seedPosts();
+  return { entries, posts };
+}
+
 // ── Initialize ───────────────────────────────────────────────────────────────
 async function initialize() {
   if (_initialized || _initializing || typeof window === "undefined") return;
   _initializing = true;
+
+  // Phase 1 — instant: render static seed data immediately so no visitor sees a blank page
+  if (_entries.length === 0) {
+    const { entries, posts } = buildStaticSeed();
+    _entries = entries;
+    _posts = posts;
+    _initialized = true;
+    emit();
+  }
 
   try {
     await ensureAuth();
@@ -130,7 +152,7 @@ async function initialize() {
       .order("created_at", { ascending: false })
       .limit(2000);
 
-    // ── Seed entries ──
+    // ── Seed entries into DB (runs once per region via settings guard) ──
     let seeded = false;
 
     if (!entryRows || entryRows.length < 50) {
@@ -175,11 +197,13 @@ async function initialize() {
       seeded = true;
     }
 
+    // Phase 2 — replace with real DB data if available (overrides static seed)
     if (seeded || !entryRows) {
       const { data: fresh } = await supabase.from("entries").select("*").order("created_at", { ascending: false }).limit(2000);
-      _entries = (fresh ?? []).map(rowToEntry);
-    } else {
+      if (fresh && fresh.length > 0) { _entries = fresh.map(rowToEntry); emit(); }
+    } else if (entryRows.length > 0) {
       _entries = entryRows.map(rowToEntry);
+      emit();
     }
 
     // ── Fetch posts ──
@@ -189,13 +213,13 @@ async function initialize() {
       .order("created_at", { ascending: false })
       .limit(100);
 
-    const seeds = seedPosts();
-    const needsMorePosts = !postRows || postRows.length < seeds.length;
+    const seedPostList = seedPosts();
+    const needsMorePosts = !postRows || postRows.length < seedPostList.length;
     const existingContents = new Set((postRows ?? []).map((r) => r.content as string));
 
     if (needsMorePosts) {
-      for (const p of seeds) {
-        if (existingContents.has(p.content)) continue; // skip already-seeded posts
+      for (const p of seedPostList) {
+        if (existingContents.has(p.content)) continue;
         const { data: inserted } = await supabase
           .from("posts")
           .insert({ user_id: _userId, author: p.author, type: p.type, content: p.content, tags: p.tags, upvotes: p.upvotes, downvotes: p.downvotes, created_at: p.createdAt })
@@ -208,9 +232,10 @@ async function initialize() {
         }
       }
       const { data: fresh } = await supabase.from("posts").select("*, comments(*)").order("created_at", { ascending: false }).limit(100);
-      _posts = (fresh ?? []).map(rowToPost);
-    } else {
+      if (fresh && fresh.length > 0) { _posts = fresh.map(rowToPost); emit(); }
+    } else if (postRows && postRows.length > 0) {
       _posts = postRows.map(rowToPost);
+      emit();
     }
 
     // ── Fetch profile ──
