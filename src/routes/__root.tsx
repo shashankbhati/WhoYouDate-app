@@ -10,6 +10,7 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import { Analytics } from "@vercel/analytics/react";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Header } from "../components/datedata/Header";
 import { Toaster } from "../components/ui/sonner";
@@ -190,6 +191,7 @@ function RootComponent() {
         <Toaster />
         <AuthModal open={modal.open} message={modal.message} />
         <UsernameSetup open={showUsernameSetup} onDone={() => setShowUsernameSetup(false)} />
+        <Analytics />
       </div>
     </QueryClientProvider>
   );
