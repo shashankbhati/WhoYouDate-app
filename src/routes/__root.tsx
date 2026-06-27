@@ -89,6 +89,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "author", content: "WhoAmIDating" },
       { property: "og:title", content: "WhoAmIDating — How Much Does Dating Really Cost?" },
       { property: "og:description", content: "Anonymous community ledger of real dating costs. Search any name. See what people spend on dates in your city." },
+      { property: "og:url", content: "https://www.whoamidating.singles/" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@whoamidating" },
@@ -98,10 +99,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b36138f3-1977-4255-a689-253906a7d5ef/id-preview-bc380d38--cb4d77ac-7f23-46df-84df-d3a2282e1fec.lovable.app-1780072729691.png" },
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: appCss },
+      { rel: "canonical", href: "https://www.whoamidating.singles/" },
     ],
   }),
   shellComponent: RootShell,
