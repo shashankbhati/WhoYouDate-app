@@ -10,6 +10,9 @@ let _profile: Profile | null = null;
 let _userId = "";
 let _initializing = false;
 let _initialized = false;
+// True only after the profile row has actually been fetched from the DB.
+// Distinct from _initialized (which flips early once seed data is shown).
+let _profileChecked = false;
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -256,6 +259,7 @@ async function initialize() {
         relationshipStage: profileRow.relationship_stage,
       };
     }
+    _profileChecked = true;
 
     _initialized = true;
     emit();
@@ -290,6 +294,28 @@ export async function addEntry(e: Entry) {
     .select()
     .single();
   if (data && !error) { _entries = [rowToEntry(data), ..._entries]; emit(); }
+}
+
+export async function deleteEntry(id: string) {
+  if (typeof window === "undefined") return;
+  await ensureAuth();
+  await supabase.from("entries").delete().eq("id", id).eq("user_id", _userId);
+  _entries = _entries.filter((e) => e.id !== id);
+  emit();
+}
+
+export async function editEntry(id: string, patch: Partial<Pick<Entry, "amountCents" | "partnerName" | "mood" | "activity">>) {
+  if (typeof window === "undefined") return;
+  await ensureAuth();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const row: Record<string, any> = {};
+  if (patch.amountCents != null) row.amount_cents = patch.amountCents;
+  if (patch.partnerName != null) row.partner_name = patch.partnerName;
+  if (patch.mood != null) row.mood = patch.mood;
+  if (patch.activity != null) row.activity = patch.activity;
+  await supabase.from("entries").update(row).eq("id", id).eq("user_id", _userId);
+  _entries = _entries.map((e) => e.id === id ? { ...e, ...patch } : e);
+  emit();
 }
 
 export async function addPost(p: Post) {
@@ -387,7 +413,7 @@ export function useStore() {
     if (!_initialized && !_initializing) initialize();
     return () => { listeners.delete(listener); };
   }, []);
-  return { entries: _entries, posts: _posts, profile: _profile, userId: _userId, loading: !_initialized };
+  return { entries: _entries, posts: _posts, profile: _profile, userId: _userId, loading: !_initialized, profileChecked: _profileChecked };
 }
 
 // ── Auth state change — reset store when user switches accounts ───────────────
@@ -398,6 +424,7 @@ if (typeof window !== "undefined") {
       _entries = [];
       _posts = [];
       _profile = null;
+      _profileChecked = false;
       _userId = incomingId;
       _initialized = false;
       _initializing = false;

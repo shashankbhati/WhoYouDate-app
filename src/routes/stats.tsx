@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { useStore, getUserId } from "@/lib/datedata/store";
+import { useStore, getUserId, deleteEntry, editEntry } from "@/lib/datedata/store";
 
 const DatingMap = lazy(() => import("@/components/datedata/DatingMap"));
 import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
 import { earnedBadges } from "@/lib/datedata/badges";
-import { Calendar, DollarSign, TrendingUp, Heart, Share2 } from "lucide-react";
+import { Calendar, DollarSign, TrendingUp, Heart, Share2, Pencil, Trash2, Check, X } from "lucide-react";
 import { sharePersonalCard } from "@/lib/shareCard";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/stats")({
   head: () => ({
@@ -138,7 +139,7 @@ function Stats() {
   }, [mine]);
 
   const badges = earnedBadges(mine);
-  const recent = mine.slice(0, 5);
+  const recent = mine.slice(0, 30);
 
   // Detect primary currency from entries
   const currencyCount: Record<string, number> = {};
@@ -331,18 +332,11 @@ function Stats() {
           <div className="rounded-2xl border border-border bg-card p-5">
             <h3 className="text-xs font-bold tracking-wider mb-3">RECENT DATES</h3>
             {recent.length === 0 && <p className="text-sm text-muted-foreground">No entries yet.</p>}
-            {recent.map((e) => (
-              <div key={e.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                <div className="flex items-center gap-2">
-                  <span>{ACTIVITY_META[e.activity].emoji}</span>
-                  <div>
-                    <div className="text-sm font-medium">{e.partnerName} <span className="ml-1">{MOOD_META[e.mood].emoji}</span></div>
-                    <div className="text-xs text-muted-foreground">{relDays(e.createdAt)}</div>
-                  </div>
-                </div>
-                <span className="text-sm font-bold text-primary">€{(e.amountCents / 100).toFixed(0)}</span>
-              </div>
-            ))}
+            <div className="max-h-[420px] overflow-y-auto -mx-1 px-1">
+              {recent.map((e) => (
+                <EntryRow key={e.id} entry={e} />
+              ))}
+            </div>
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-5">
@@ -363,6 +357,93 @@ function Stats() {
         </aside>
       </div>
     </main>
+  );
+}
+
+function EntryRow({ entry: e }: { entry: ReturnType<typeof useStore>["entries"][number] }) {
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [name, setName] = useState(e.partnerName);
+  const [amount, setAmount] = useState((e.amountCents / 100).toString());
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    const cents = Math.round(parseFloat(amount) * 100);
+    if (!name.trim()) return toast.error("Name can't be empty.");
+    if (isNaN(cents) || cents < 0) return toast.error("Enter a valid amount.");
+    setBusy(true);
+    await editEntry(e.id, { partnerName: name.trim(), amountCents: cents });
+    setBusy(false);
+    setEditing(false);
+    toast.success("Date updated");
+  }
+
+  async function remove() {
+    setBusy(true);
+    await deleteEntry(e.id);
+    toast.success("Date removed");
+  }
+
+  if (editing) {
+    return (
+      <div className="py-2 border-b border-border last:border-0 space-y-2">
+        <div className="flex items-center gap-2">
+          <span>{ACTIVITY_META[e.activity].emoji}</span>
+          <input
+            value={name}
+            onChange={(ev) => setName(ev.target.value)}
+            placeholder="First name"
+            className="flex-1 min-w-0 rounded-lg bg-input border border-border px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+          />
+          <input
+            type="number"
+            step="0.01"
+            value={amount}
+            onChange={(ev) => setAmount(ev.target.value)}
+            placeholder="0"
+            className="w-20 rounded-lg bg-input border border-border px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+          />
+        </div>
+        <div className="flex justify-end gap-1">
+          <button onClick={save} disabled={busy} className="flex items-center gap-1 rounded-lg bg-primary text-primary-foreground px-2.5 py-1 text-xs font-semibold hover:opacity-90 disabled:opacity-50">
+            <Check className="h-3.5 w-3.5" /> Save
+          </button>
+          <button onClick={() => { setEditing(false); setName(e.partnerName); setAmount((e.amountCents / 100).toString()); }} className="flex items-center gap-1 rounded-lg bg-muted px-2.5 py-1 text-xs font-medium hover:text-foreground">
+            <X className="h-3.5 w-3.5" /> Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group flex items-center justify-between py-2 border-b border-border last:border-0">
+      <div className="flex items-center gap-2 min-w-0">
+        <span>{ACTIVITY_META[e.activity].emoji}</span>
+        <div className="min-w-0">
+          <div className="text-sm font-medium truncate">{e.partnerName} <span className="ml-1">{MOOD_META[e.mood].emoji}</span></div>
+          <div className="text-xs text-muted-foreground">{relDays(e.createdAt)}</div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-sm font-bold text-primary">€{(e.amountCents / 100).toFixed(0)}</span>
+        {confirming ? (
+          <div className="flex items-center gap-1">
+            <button onClick={remove} disabled={busy} className="rounded-md bg-red-500/15 text-red-500 px-2 py-1 text-xs font-semibold hover:bg-red-500/25 disabled:opacity-50">Delete</button>
+            <button onClick={() => setConfirming(false)} className="rounded-md bg-muted px-2 py-1 text-xs hover:text-foreground">Keep</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            <button onClick={() => setEditing(true)} title="Edit" className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground">
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button onClick={() => setConfirming(true)} title="Delete" className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-red-500">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

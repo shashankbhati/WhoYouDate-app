@@ -101,6 +101,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "canonical", href: "https://www.whoamidating.singles/" },
+      { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "apple-touch-icon", href: "/icon.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -173,18 +175,21 @@ function Footer() {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const { isReal, modal } = useAuthState();
-  const { profile, loading: storeLoading } = useStore();
+  const { profile, profileChecked } = useStore();
   const [showUsernameSetup, setShowUsernameSetup] = useState(false);
 
-  // Show username setup once after email is confirmed and no profile exists yet
+  // Show username setup only for a real (logged-in) user whose profile has been
+  // confirmed-fetched and genuinely doesn't exist yet — i.e. brand new accounts.
+  // Gating on profileChecked (not storeLoading) prevents the modal flashing for
+  // existing users before their profile row has loaded.
   useEffect(() => {
-    if (isReal && !storeLoading && !profile) {
+    if (isReal && profileChecked && !profile) {
       setShowUsernameSetup(true);
     }
     if (profile) {
       setShowUsernameSetup(false);
     }
-  }, [isReal, storeLoading, profile]);
+  }, [isReal, profileChecked, profile]);
 
   return (
     <QueryClientProvider client={queryClient}>
