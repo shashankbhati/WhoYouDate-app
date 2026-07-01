@@ -29,29 +29,38 @@ const FEATURED_NAMES: Record<CountryCode, string[]> = {
   US: ["Ashley", "Tyler", "Emma", "Jordan"],
 };
 
-const BAR_HEIGHT = 120; // px — tall enough to read, compact enough to sit side-by-side
+const BAR_HEIGHT = 132; // px — tall enough to read, compact enough to sit side-by-side
 
-function BarChart({ data, highlightFirst = true }: { data: { name: string; value: number }[]; highlightFirst?: boolean }) {
+function BarChart({ data, highlightFirst = true, format }: { data: { name: string; value: number }[]; highlightFirst?: boolean; format?: (v: number) => string }) {
   const max = Math.max(1, ...data.map((d) => d.value));
+  const fmt = format ?? ((v: number) => String(Math.round(v)));
+  const cols = Math.max(data.length, 1);
+  const gridCols = { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` };
   return (
     <div className="mt-4 px-1">
-      {/* Bar area */}
-      <div className="grid grid-cols-6 gap-2 items-end" style={{ height: BAR_HEIGHT }}>
+      {/* Bar area — value label sits above each bar so the chart reads clearly
+          even when one outlier dominates the scale */}
+      <div className="grid gap-2 items-end" style={{ height: BAR_HEIGHT, ...gridCols }}>
         {data.map((d, i) => {
-          const barH = Math.max(Math.round((d.value / max) * BAR_HEIGHT), 6);
+          // Proportional height, reserving room for the value label, with a
+          // visible floor so no bar ever looks empty/broken.
+          const barH = Math.max(Math.round((d.value / max) * (BAR_HEIGHT - 24)), 14);
+          const isTop = highlightFirst && i === 0;
           return (
-            <div key={d.name} className="flex items-end justify-center h-full">
+            <div key={d.name} className="flex flex-col items-center justify-end h-full">
+              <span className={`text-[10px] font-bold leading-none mb-1 ${isTop ? "text-primary" : "text-muted-foreground"}`}>
+                {fmt(d.value)}
+              </span>
               <div
-                className={`w-full rounded-t-md transition-all ${highlightFirst && i === 0 ? "bg-primary" : "bg-muted"}`}
+                className={`w-full rounded-t-md transition-all ${isTop ? "bg-primary" : "bg-primary/30"}`}
                 style={{ height: barH }}
-                title={String(Math.round(d.value))}
               />
             </div>
           );
         })}
       </div>
       {/* Labels below bars */}
-      <div className="grid grid-cols-6 gap-2 mt-1.5 px-0">
+      <div className="grid gap-2 mt-1.5" style={gridCols}>
         {data.map((d) => (
           <span key={d.name} className="text-xs text-muted-foreground truncate text-center block">{d.name}</span>
         ))}
@@ -77,6 +86,17 @@ function Home() {
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLInputElement>(null);
+  const [heroName, setHeroName] = useState("");
+  const [lookupSeed, setLookupSeed] = useState<{ q: string; n: number } | null>(null);
+
+  function runHeroSearch(name?: string) {
+    const v = (name ?? heroName).trim();
+    if (!v) return;
+    setHeroName(v);
+    setTab("lookup");
+    setLookupSeed({ q: v, n: Date.now() }); // nonce forces re-trigger on repeat searches
+    setTimeout(() => document.getElementById("ledger-tabs")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  }
 
   // Reset selected city when country changes
   useEffect(() => { setCity(config.defaultCity); }, [country, config.defaultCity]);
@@ -161,25 +181,59 @@ function Home() {
   return (
     <main className="mx-auto max-w-7xl px-4 py-6">
       {/* Hero */}
-      <section className="py-8 sm:py-12">
-        <p className="text-xs font-semibold tracking-widest text-primary mb-5">VOL. 01 —— THE COMMUNITY LEDGER</p>
-        <h1 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
-          An anonymous ledger of <em>modern dating</em>.
-        </h1>
-        <p className="mt-4 text-muted-foreground max-w-xl leading-relaxed">
-          No real names. No phone numbers. No apps tracking you back. Just a quiet, open record of what dating actually looks like — what it costs, how it feels, and what people are learning from it.
-        </p>
-        <div className="flex items-center gap-3 mt-6 flex-wrap">
-          <Link to="/log" className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-5 py-2.5 font-semibold text-sm hover:opacity-90 transition">
-            Log an entry
-          </Link>
-          <Link to="/privacy" className="inline-flex items-center gap-2 rounded-full border border-border text-foreground px-5 py-2.5 font-semibold text-sm hover:bg-muted transition">
-            How anonymity works
-          </Link>
-          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <span className="inline-block h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            {totalEntries.toLocaleString()} dates in the ledger
-          </span>
+      <section className="py-8 sm:py-12 grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <div>
+          <p className="text-xs font-semibold tracking-widest text-primary mb-5">VOL. 01 —— THE COMMUNITY LEDGER</p>
+          <h1 className="text-4xl sm:text-5xl font-bold leading-tight">
+            How much does <em>dating</em> really cost?
+          </h1>
+          <p className="mt-4 text-muted-foreground max-w-xl leading-relaxed">
+            Search any first name and see what the community anonymously logged — average spend, happy rate, second dates, and more. No real names, no numbers, no apps tracking you back.
+          </p>
+          <div className="flex items-center gap-3 mt-6 flex-wrap">
+            <Link to="/log" className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-5 py-2.5 font-semibold text-sm hover:opacity-90 transition">
+              Log an entry
+            </Link>
+            <Link to="/privacy" className="inline-flex items-center gap-2 rounded-full border border-border text-foreground px-5 py-2.5 font-semibold text-sm hover:bg-muted transition">
+              How anonymity works
+            </Link>
+            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <span className="inline-block h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              {totalEntries.toLocaleString()} dates in the ledger
+            </span>
+          </div>
+        </div>
+
+        {/* Hero name search — the hook, front and center */}
+        <div className="rounded-3xl border border-border bg-card p-6 sm:p-7 shadow-xl">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">🔍</span>
+            <h2 className="font-bold text-lg">Search a name</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">What does the community say about dating a…</p>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <input
+                value={heroName}
+                onChange={(e) => setHeroName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") runHeroSearch(); }}
+                placeholder="Type any first name…"
+                className="w-full rounded-full bg-input border border-border pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+              />
+            </div>
+            <button onClick={() => runHeroSearch()} className="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm font-semibold hover:opacity-90 shrink-0">
+              Search
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <span className="text-xs text-muted-foreground self-center">Try:</span>
+            {FEATURED_NAMES[country].map((n) => (
+              <button key={n} onClick={() => runHeroSearch(n)} className="px-3 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground hover:text-foreground transition">
+                {n}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -246,7 +300,7 @@ function Home() {
               ))}
             </div>
           </div>
-          {costliest.length > 0 ? <BarChart data={costliest} /> : <p className="text-sm text-muted-foreground py-6 text-center">Need 3+ entries per name.</p>}
+          {costliest.length > 0 ? <BarChart data={costliest} format={(v) => `${config.currencySymbol}${(v / 100).toFixed(0)}`} /> : <p className="text-sm text-muted-foreground py-6 text-center">Need 3+ entries per name.</p>}
           <div className="flex items-center justify-between mt-2">
             <p className="text-xs text-muted-foreground">Avg {config.currencySymbol}/date. Min 3 entries per name.</p>
             {costliest.length > 0 && (
@@ -275,7 +329,7 @@ function Home() {
               ))}
             </div>
           </div>
-          <BarChart data={trendingPartner} />
+          <BarChart data={trendingPartner} format={(v) => partnerMetric === "cost" ? `${config.currencySymbol}${(v / 100).toFixed(0)}` : partnerMetric === "happy" ? `${Math.round(v)}%` : String(Math.round(v))} />
           <div className="flex justify-end mt-2">
             <button
               onClick={() => shareTrendingCard(trendingPartner, partnerMetric, config.currencySymbol)}
@@ -291,7 +345,7 @@ function Home() {
       <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
         <div>
           {/* Tabs */}
-          <div className="flex flex-wrap items-center gap-1 rounded-2xl border border-border bg-card p-2 mb-4">
+          <div id="ledger-tabs" className="flex flex-wrap items-center gap-1 rounded-2xl border border-border bg-card p-2 mb-4 scroll-mt-20">
             {([["feed", "Feed"], ["lookup", "Name Lookup"]] as const).map(([k, l]) => (
               <button key={k} onClick={() => setTab(k)} className={`px-4 py-2 rounded-md text-sm font-medium transition ${tab === k ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{l}</button>
             ))}
@@ -299,7 +353,7 @@ function Home() {
 
           {tab === "lookup" ? (
             <div className="space-y-4">
-              <NameAnalyticsPanel entries={entries} currency={config.defaultCurrency} featuredNames={FEATURED_NAMES[country]} />
+              <NameAnalyticsPanel entries={entries} currency={config.defaultCurrency} featuredNames={FEATURED_NAMES[country]} seed={lookupSeed} />
               <CityHotspotsPanel entries={displayEntries} />
               <CityComparisonPanel entries={displayEntries} config={config} />
             </div>
@@ -666,11 +720,17 @@ function convertCents(cents: number, from: string, to: string): number {
   return (cents / (RATES_PER_EUR[from] ?? 1)) * (RATES_PER_EUR[to] ?? 1);
 }
 
-function NameAnalyticsPanel({ entries, currency, featuredNames }: { entries: ReturnType<typeof useStore>["entries"]; currency: string; featuredNames: string[] }) {
+function NameAnalyticsPanel({ entries, currency, featuredNames, seed }: { entries: ReturnType<typeof useStore>["entries"]; currency: string; featuredNames: string[]; seed?: { q: string; n: number } | null }) {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [cityInput, setCityInput] = useState("");
   const [cityQuery, setCityQuery] = useState("");
+
+  // When the hero search drives a lookup, adopt its query (nonce re-triggers)
+  useEffect(() => {
+    if (seed && seed.q) { setInput(seed.q); setQuery(seed.q); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed?.n]);
 
   // Derive popular cities from all entries for chips
   const popularCities = useMemo(() => {
