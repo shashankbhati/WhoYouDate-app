@@ -367,6 +367,22 @@ export async function deletePost(id: string) {
   emit();
 }
 
+// ── Email subscriptions (weekly digest + watch-a-name notifications) ──────────
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export async function subscribe(opts: { email: string; watchName?: string; wantsDigest?: boolean }): Promise<{ ok: boolean; error?: string }> {
+  if (typeof window === "undefined") return { ok: false };
+  const email = opts.email.trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) return { ok: false, error: "Enter a valid email address." };
+  const watch_name = (opts.watchName ?? "").trim().toLowerCase();
+  const { error } = await supabase
+    .from("subscriptions")
+    // ignoreDuplicates so re-subscribing the same (email, name) is a no-op, not an error
+    .upsert({ email, watch_name, wants_digest: opts.wantsDigest ?? true }, { onConflict: "email,watch_name", ignoreDuplicates: true });
+  if (error) return { ok: false, error: "Could not subscribe. Please try again." };
+  return { ok: true };
+}
+
 export async function deleteComment(postId: string, commentId: string) {
   if (typeof window === "undefined") return;
   await supabase.from("comments").delete().eq("id", commentId).eq("user_id", _userId);

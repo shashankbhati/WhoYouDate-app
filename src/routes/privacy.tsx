@@ -37,6 +37,7 @@ function PrivacyPage() {
           <li>Community posts and comments you write</li>
           <li>A display profile you optionally set: username, age range, city, country, relationship stage</li>
           <li>Your email address if you choose to sign in (used only for authentication, never shown publicly)</li>
+          <li>Your email address if you opt in to the weekly digest or "watch a name" notifications — stored only to send those emails, never shared, and removable via the one-click unsubscribe link in every email</li>
         </ul>
       </Section>
 

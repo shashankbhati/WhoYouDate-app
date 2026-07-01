@@ -10,6 +10,7 @@ import { COUNTRY_CONFIG, fmtAmount, currencySymbol, type CountryCode } from "@/l
 import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react";
 import { shareCard, shareTrendingCard, shareNameCard } from "@/lib/shareCard";
 import { computeInsights } from "@/lib/datedata/insights";
+import { NotifyOptIn } from "@/components/datedata/NotifyOptIn";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -473,6 +474,8 @@ function Home() {
           )}
 
           <LiveFeed entries={displayEntries} />
+
+          <NotifyOptIn mode="digest" />
 
           <p className="text-xs text-muted-foreground text-center pb-2">
             <Link to="/privacy" className="hover:text-foreground transition">Privacy &amp; data</Link>
@@ -1008,6 +1011,9 @@ function NameAnalyticsPanel({ entries, currency, featuredNames, seed }: { entrie
               </div>
             </div>
           </div>
+
+          {/* Watch this name — retention hook */}
+          <NotifyOptIn mode="watch" watchName={query} />
         </>
       )}
     </div>
