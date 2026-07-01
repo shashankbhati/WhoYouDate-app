@@ -13,6 +13,7 @@ export interface Entry {
   meetVia?: string;
   secondDate?: "yes" | "no" | "together";
   note?: string;
+  turningPoint?: string; // one-word "what made or broke it" tag
   city: string;
   lat?: number;
   lon?: number;

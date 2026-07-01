@@ -32,6 +32,7 @@ function rowToEntry(r: any): Entry {
     meetVia: r.meet_via ?? undefined,
     secondDate: r.second_date ?? undefined,
     note: r.note ?? undefined,
+    turningPoint: r.turning_point ?? undefined,
     city: r.city,
     lat: r.lat ?? undefined,
     lon: r.lon ?? undefined,
@@ -113,6 +114,7 @@ function entryToRow(e: Entry) {
     city: e.city,
     ...(e.lat != null ? { lat: e.lat } : {}),
     ...(e.lon != null ? { lon: e.lon } : {}),
+    ...(e.turningPoint ? { turning_point: e.turningPoint } : {}),
     entry_date: e.entryDate,
     created_at: e.createdAt,
   };
@@ -288,6 +290,7 @@ export async function addEntry(e: Entry) {
       city: e.city,
       ...(e.lat != null ? { lat: e.lat } : {}),
       ...(e.lon != null ? { lon: e.lon } : {}),
+      ...(e.turningPoint ? { turning_point: e.turningPoint } : {}),
       entry_date: e.entryDate,
       created_at: e.createdAt,
     })

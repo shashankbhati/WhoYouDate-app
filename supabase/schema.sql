@@ -34,7 +34,10 @@ CREATE TABLE IF NOT EXISTS entries (
   meet_via     text,
   second_date  text CHECK (second_date IN ('yes', 'no', 'together')),
   note         text,
+  turning_point text,
   city         text NOT NULL DEFAULT 'Berlin',
+  lat          double precision,
+  lon          double precision,
   entry_date   timestamptz NOT NULL DEFAULT now(),
   created_at   timestamptz DEFAULT now()
 );
@@ -95,6 +98,7 @@ CREATE POLICY "update_own_profile"  ON profiles FOR UPDATE USING (auth.uid() = u
 -- entries: everyone reads (for analytics), only own user writes
 CREATE POLICY "read_all_entries"  ON entries FOR SELECT USING (true);
 CREATE POLICY "insert_own_entry"  ON entries FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "update_own_entry"  ON entries FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "delete_own_entry"  ON entries FOR DELETE USING (auth.uid() = user_id);
 
 -- posts

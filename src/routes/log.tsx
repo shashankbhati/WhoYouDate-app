@@ -45,6 +45,8 @@ const SECOND = [
   { id: "no" as const, label: "❌ No", sub: "Not feeling it" },
   { id: "together" as const, label: "💗 Together", sub: "Already a couple" },
 ];
+// Quick-tap "what made or broke it" tags — tappable so it's zero-friction
+const TURNING_POINTS = ["Chemistry", "Money", "Kids", "His ex", "Her ex", "Distance", "Vibe", "Ghosted", "Looks", "Politics", "Values", "Timing"];
 
 function LogDate() {
   const navigate = useNavigate();
@@ -61,6 +63,7 @@ function LogDate() {
   const [meet, setMeet] = useState<string | undefined>();
   const [mood, setMood] = useState<Mood | null>(null);
   const [second, setSecond] = useState<typeof SECOND[number]["id"] | undefined>();
+  const [turningPoint, setTurningPoint] = useState<string>("");
 
   function handleCityChange(val: string) {
     setCityInput(val);
@@ -115,6 +118,7 @@ function LogDate() {
       mood,
       meetVia: meet,
       secondDate: second,
+      turningPoint: turningPoint.trim() || undefined,
       city: selectedCity?.name ?? cityInput.trim(),
       lat: selectedCity?.lat,
       lon: selectedCity?.lon,
@@ -227,6 +231,28 @@ function LogDate() {
               </button>
             ))}
           </div>
+        </Field>
+
+        <Field label="In one word — what made it or broke it?" optional>
+          <div className="flex flex-wrap gap-2">
+            {TURNING_POINTS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTurningPoint(turningPoint === t ? "" : t)}
+                className={`rounded-full border px-4 py-2 text-sm font-medium transition ${turningPoint === t ? "border-primary bg-primary/10 text-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <input
+            value={TURNING_POINTS.includes(turningPoint) ? "" : turningPoint}
+            onChange={(e) => setTurningPoint(e.target.value.slice(0, 24))}
+            placeholder="…or type your own"
+            className="mt-3 w-full rounded-xl bg-input border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+          />
+          <p className="text-xs text-muted-foreground mt-1.5">Anonymous — this powers the community's "why dates work (or don't)" data.</p>
         </Field>
 
         <button type="submit" className="w-full rounded-full bg-primary text-primary-foreground py-3 font-semibold hover:opacity-90 transition">Log this date 🎉</button>

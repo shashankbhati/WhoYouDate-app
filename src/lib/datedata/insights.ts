@@ -123,5 +123,13 @@ export function computeInsights(entries: Entry[], opts: { currencySymbol: string
     out.push({ emoji: "🧾", text: `The average logged date costs ${opts.currencySymbol}${avg.toFixed(0)}.` });
   }
 
+  // 6. Top reason dates ended (from the "what made or broke it" tag on failures)
+  const failedTags = entries.filter((e) => e.secondDate === "no" && e.turningPoint);
+  if (failedTags.length >= MIN_SAMPLE) {
+    const counts = groupBy(failedTags, (e) => e.turningPoint as string);
+    const top = Object.entries(counts).sort((a, b) => b[1].length - a[1].length)[0];
+    if (top) out.push({ emoji: "🚩", text: `The #1 reason logged dates didn't get a second round: ${top[0]}.` });
+  }
+
   return out;
 }
