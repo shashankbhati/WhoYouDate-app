@@ -9,6 +9,7 @@ import { useCountry, setCountry } from "@/lib/country";
 import { COUNTRY_CONFIG, fmtAmount, currencySymbol, type CountryCode } from "@/lib/datedata/countries";
 import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react";
 import { shareCard, shareTrendingCard, shareNameCard } from "@/lib/shareCard";
+import { computeInsights } from "@/lib/datedata/insights";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -139,6 +140,11 @@ function Home() {
     })).sort((a, b) => b.value - a.value).slice(0, 6);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayEntries, partnerMetric, trendingGender]);
+
+  const insights = useMemo(
+    () => computeInsights(displayEntries, { currencySymbol: config.currencySymbol, includeCost: country !== "all" }),
+    [displayEntries, config.currencySymbol, country]
+  );
 
   const trendingActivity = useMemo(() => {
     const c: Record<string, number> = {};
@@ -340,6 +346,24 @@ function Home() {
           </div>
         </section>
       </div>}
+
+      {/* What the data says — community insights */}
+      {!loading && insights.length > 0 && (
+        <section className="mt-6 rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-xs font-bold tracking-wider">💡 WHAT THE DATA SAYS</h2>
+            <span className="text-xs text-muted-foreground">— patterns from the community ledger</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {insights.slice(0, 4).map((ins, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-xl bg-muted/40 p-3">
+                <span className="text-xl leading-none shrink-0">{ins.emoji}</span>
+                <p className="text-sm leading-snug">{ins.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Feed + sidebar */}
       <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
