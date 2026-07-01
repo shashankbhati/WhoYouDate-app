@@ -379,7 +379,14 @@ export async function subscribe(opts: { email: string; watchName?: string; wants
     .from("subscriptions")
     // ignoreDuplicates so re-subscribing the same (email, name) is a no-op, not an error
     .upsert({ email, watch_name, wants_digest: opts.wantsDigest ?? true }, { onConflict: "email,watch_name", ignoreDuplicates: true });
-  if (error) return { ok: false, error: "Could not subscribe. Please try again." };
+  if (error) {
+    console.error("[subscribe] Supabase error:", error);
+    // Surface the real cause so setup issues (missing table/policy) are obvious
+    const msg = /relation .*subscriptions.* does not exist|schema cache/i.test(error.message)
+      ? "Subscriptions table not found — run migration_subscriptions.sql in Supabase."
+      : error.message || "Could not subscribe. Please try again.";
+    return { ok: false, error: msg };
+  }
   return { ok: true };
 }
 
