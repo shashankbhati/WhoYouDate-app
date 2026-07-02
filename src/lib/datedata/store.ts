@@ -28,6 +28,7 @@ function rowToEntry(r: any): Entry {
     amountCents: r.amount_cents,
     currency: r.currency,
     partnerName: r.partner_name,
+    partnerTag: r.partner_tag ?? undefined,
     mood: r.mood,
     meetVia: r.meet_via ?? undefined,
     secondDate: r.second_date ?? undefined,
@@ -115,6 +116,7 @@ function entryToRow(e: Entry) {
     ...(e.lat != null ? { lat: e.lat } : {}),
     ...(e.lon != null ? { lon: e.lon } : {}),
     ...(e.turningPoint ? { turning_point: e.turningPoint } : {}),
+    ...(e.partnerTag ? { partner_tag: e.partnerTag } : {}),
     entry_date: e.entryDate,
     created_at: e.createdAt,
   };
@@ -291,6 +293,7 @@ export async function addEntry(e: Entry) {
       ...(e.lat != null ? { lat: e.lat } : {}),
       ...(e.lon != null ? { lon: e.lon } : {}),
       ...(e.turningPoint ? { turning_point: e.turningPoint } : {}),
+      ...(e.partnerTag ? { partner_tag: e.partnerTag } : {}),
       entry_date: e.entryDate,
       created_at: e.createdAt,
     })

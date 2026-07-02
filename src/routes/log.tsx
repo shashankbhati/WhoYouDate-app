@@ -47,6 +47,8 @@ const SECOND = [
 ];
 // Quick-tap "what made or broke it" tags — tappable so it's zero-friction
 const TURNING_POINTS = ["Chemistry", "Money", "Kids", "His ex", "Her ex", "Distance", "Vibe", "Ghosted", "Looks", "Politics", "Values", "Timing"];
+// Private markers to distinguish two same-named partners in your own stats
+const PARTNER_TAGS = ["🌸", "⚡", "🌙", "🔥", "⭐", "🎯", "🍀", "💎"];
 
 function LogDate() {
   const navigate = useNavigate();
@@ -54,6 +56,7 @@ function LogDate() {
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<string>(() => getCountryConfig().defaultCurrency);
   const [partner, setPartner] = useState("");
+  const [partnerTag, setPartnerTag] = useState<string>("");
   const [cityInput, setCityInput] = useState<string>(() => getProfile()?.city ?? getCountryConfig().defaultCity);
   const [selectedCity, setSelectedCity] = useState<{ name: string; lat: number; lon: number } | null>(null);
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
@@ -116,6 +119,7 @@ function LogDate() {
       amountCents: Math.round(+amount * 100),
       currency,
       partnerName: partner.trim(),
+      partnerTag: partnerTag || undefined,
       mood,
       meetVia: meet,
       secondDate: second,
@@ -160,6 +164,23 @@ function LogDate() {
 
         <Field label="Partner First Name" required>
           <input value={partner} onChange={(e) => setPartner(e.target.value)} placeholder="First name only, e.g. Sam, Luna..." className="w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40" />
+          <div className="mt-2.5">
+            <p className="text-xs text-muted-foreground mb-1.5">
+              Dating two people with the same name? Add a private marker to tell them apart — <span className="text-foreground">only you ever see it</span>.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {PARTNER_TAGS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setPartnerTag(partnerTag === t ? "" : t)}
+                  className={`h-9 w-9 rounded-full border text-base grid place-items-center transition ${partnerTag === t ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
         </Field>
 
         <Field label="City (where did the date happen?)" required>

@@ -9,6 +9,7 @@ export interface Entry {
   amountCents: number;
   currency: string;
   partnerName: string;
+  partnerTag?: string; // private marker (emoji) to tell two same-named partners apart — only in the owner's own stats
   mood: Mood;
   meetVia?: string;
   secondDate?: "yes" | "no" | "together";

@@ -133,16 +133,19 @@ function Stats() {
   useEffect(() => setMapReady(true), []);
 
   const partnerStats = useMemo(() => {
-    const map: Record<string, { count: number; total: number; moods: number[] }> = {};
+    // Group by name + private tag so two same-named partners stay separate in
+    // YOUR ledger (the community still aggregates by first name only).
+    const map: Record<string, { name: string; count: number; total: number; moods: number[] }> = {};
     mine.forEach((e) => {
-      if (!map[e.partnerName]) map[e.partnerName] = { count: 0, total: 0, moods: [] };
-      map[e.partnerName].count++;
-      map[e.partnerName].total += e.amountCents;
-      map[e.partnerName].moods.push(e.mood);
+      const label = e.partnerTag ? `${e.partnerName} ${e.partnerTag}` : e.partnerName;
+      if (!map[label]) map[label] = { name: label, count: 0, total: 0, moods: [] };
+      map[label].count++;
+      map[label].total += e.amountCents;
+      map[label].moods.push(e.mood);
     });
-    return Object.entries(map)
-      .map(([name, v]) => ({
-        name,
+    return Object.values(map)
+      .map((v) => ({
+        name: v.name,
         count: v.count,
         avgSpend: Math.round(v.total / v.count),
         avgMood: v.moods.reduce((a, b) => a + b, 0) / v.moods.length,
@@ -469,7 +472,7 @@ function EntryRow({ entry: e }: { entry: ReturnType<typeof useStore>["entries"][
       <div className="flex items-center gap-2 min-w-0">
         <span>{ACTIVITY_META[e.activity].emoji}</span>
         <div className="min-w-0">
-          <div className="text-sm font-medium truncate">{e.partnerName} <span className="ml-1">{MOOD_META[e.mood].emoji}</span></div>
+          <div className="text-sm font-medium truncate">{e.partnerName}{e.partnerTag ? ` ${e.partnerTag}` : ""} <span className="ml-1">{MOOD_META[e.mood].emoji}</span></div>
           <div className="text-xs text-muted-foreground">{relDays(e.createdAt)}</div>
         </div>
       </div>

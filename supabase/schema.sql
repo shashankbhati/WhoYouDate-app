@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS entries (
   amount_cents integer NOT NULL,
   currency     text NOT NULL DEFAULT 'EUR',
   partner_name text NOT NULL,
+  partner_tag  text,
   mood         integer NOT NULL CHECK (mood BETWEEN 1 AND 5),
   meet_via     text,
   second_date  text CHECK (second_date IN ('yes', 'no', 'together')),
