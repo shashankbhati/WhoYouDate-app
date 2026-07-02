@@ -375,15 +375,19 @@ export async function subscribe(opts: { email: string; watchName?: string; wants
   const email = opts.email.trim().toLowerCase();
   if (!EMAIL_RE.test(email)) return { ok: false, error: "Enter a valid email address." };
   const watch_name = (opts.watchName ?? "").trim().toLowerCase();
+  // Ensure we have an (anonymous) auth session so the request runs as the
+  // `authenticated` role the RLS policy expects — not an unauthenticated request.
+  await ensureAuth();
+  // Plain insert (no upsert) to avoid ON CONFLICT interacting with RLS.
   const { error } = await supabase
     .from("subscriptions")
-    // ignoreDuplicates so re-subscribing the same (email, name) is a no-op, not an error
-    .upsert({ email, watch_name, wants_digest: opts.wantsDigest ?? true }, { onConflict: "email,watch_name", ignoreDuplicates: true });
+    .insert({ email, watch_name, wants_digest: opts.wantsDigest ?? true });
   if (error) {
+    // Duplicate (already subscribed) → treat as success
+    if ((error as { code?: string }).code === "23505") return { ok: true };
     console.error("[subscribe] Supabase error:", error);
-    // Surface the real cause so setup issues (missing table/policy) are obvious
     const msg = /relation .*subscriptions.* does not exist|schema cache/i.test(error.message)
-      ? "Subscriptions table not found — run migration_subscriptions.sql in Supabase."
+      ? "Subscriptions table not found — run the migration in Supabase."
       : error.message || "Could not subscribe. Please try again.";
     return { ok: false, error: msg };
   }
