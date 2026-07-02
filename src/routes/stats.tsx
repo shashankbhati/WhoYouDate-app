@@ -5,8 +5,11 @@ import { useStore, getUserId, deleteEntry, editEntry } from "@/lib/datedata/stor
 const DatingMap = lazy(() => import("@/components/datedata/DatingMap"));
 import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
 import { earnedBadges } from "@/lib/datedata/badges";
-import { Calendar, DollarSign, TrendingUp, Heart, Share2, Pencil, Trash2, Check, X } from "lucide-react";
+import { Calendar, DollarSign, TrendingUp, Heart, Share2, Pencil, Trash2, Check, X, Sparkles } from "lucide-react";
 import { sharePersonalCard } from "@/lib/shareCard";
+import { computePlaybook } from "@/lib/datedata/playbook";
+import { computeInsights } from "@/lib/datedata/insights";
+import { useCountry } from "@/lib/country";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/stats")({
@@ -63,8 +66,17 @@ function DonutChart({ data }: { data: { name: string; value: number }[] }) {
 
 function Stats() {
   const { entries, profile, loading } = useStore();
+  const { config } = useCountry();
   const userId = getUserId();
   const mine = entries.filter((e) => e.userId === userId);
+
+  // Personalized playbook from the user's own data; fall back to community
+  // patterns (framed as "the community's playbook") until they have ≥3 entries.
+  const playbook = useMemo(() => {
+    const personal = computePlaybook(mine, config.currencySymbol);
+    if (personal.length > 0) return { personal: true as const, items: personal };
+    return { personal: false as const, items: computeInsights(entries, { currencySymbol: config.currencySymbol, includeCost: true }).slice(0, 4) };
+  }, [mine, entries, config.currencySymbol]);
 
   const totalSpent = mine.reduce((a, e) => a + e.amountCents, 0);
   const avg = mine.length ? totalSpent / mine.length : 0;
@@ -202,6 +214,19 @@ function Stats() {
         </div>
       )}
 
+      {/* Nudge: has a couple entries but not enough to personalize the playbook */}
+      {mine.length > 0 && mine.length < 3 && (
+        <div className="mt-6 rounded-2xl border border-primary/30 bg-primary/5 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <p className="font-semibold text-sm">Add your last few dates to unlock Your Playbook 🔓</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Log {3 - mine.length} more and we'll show your personal dating strategy — what's working, what's costing you, and your best moves.</p>
+          </div>
+          <Link to="/log" className="shrink-0 inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-5 py-2 text-sm font-semibold hover:opacity-90">
+            Add a date →
+          </Link>
+        </div>
+      )}
+
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
           <div className="grid sm:grid-cols-2 gap-4">
@@ -210,6 +235,29 @@ function Stats() {
             <StatCard icon={<TrendingUp className="h-4 w-4 text-amber-400" />} label="Avg per Date" value={`€${(avg / 100).toFixed(0)}`} />
             <StatCard icon={<Heart className="h-4 w-4 text-emerald-400" />} label="Success Rate" value={mine.length ? `${successRate}%` : "—"} />
           </div>
+
+          {/* Your Playbook — personalized advice from your own data */}
+          {mine.length > 0 && playbook.items.length > 0 && (
+            <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-transparent p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <h3 className="font-bold">Your Playbook</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                {playbook.personal
+                  ? "Personalized from your own dating history."
+                  : "The community's playbook — log 3+ dates to make this personal to you."}
+              </p>
+              <div className="space-y-2.5">
+                {playbook.items.map((p, i) => (
+                  <div key={i} className="flex items-start gap-3 rounded-xl bg-card/60 border border-border p-3">
+                    <span className="text-xl leading-none shrink-0">{p.emoji}</span>
+                    <p className="text-sm leading-snug">{p.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Success formula */}
           {(successByActivity.length > 0 || successBySource.length > 0) && (
