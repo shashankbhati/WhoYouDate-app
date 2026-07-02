@@ -239,8 +239,9 @@ function Stats() {
             <StatCard icon={<Heart className="h-4 w-4 text-emerald-400" />} label="Success Rate" value={mine.length ? `${successRate}%` : "—"} />
           </div>
 
-          {/* Your Playbook — personalized advice from your own data */}
-          {mine.length > 0 && playbook.items.length > 0 && (
+          {/* Your Playbook — personalized advice from your own data; falls back
+              to the community playbook (shown to everyone, even with 0 entries) */}
+          {playbook.items.length > 0 && (
             <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-transparent p-5">
               <div className="flex items-center gap-2 mb-1">
                 <Sparkles className="h-4 w-4 text-primary" />
