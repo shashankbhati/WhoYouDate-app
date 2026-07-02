@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { addEntry, getUserId, getProfile } from "@/lib/datedata/store";
-import { ACTIVITY_META, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
+import { ACTIVITY_META, LOG_ACTIVITIES, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
 import { detectPII } from "@/lib/datedata/pii";
 import { isRealUser, openAuthModal } from "@/lib/auth";
 import { getCountryConfig } from "@/lib/country";
@@ -64,6 +64,7 @@ function LogDate() {
   const [mood, setMood] = useState<Mood | null>(null);
   const [second, setSecond] = useState<typeof SECOND[number]["id"] | undefined>();
   const [turningPoint, setTurningPoint] = useState<string>("");
+  const [note, setNote] = useState<string>("");
 
   function handleCityChange(val: string) {
     setCityInput(val);
@@ -119,6 +120,7 @@ function LogDate() {
       meetVia: meet,
       secondDate: second,
       turningPoint: turningPoint.trim() || undefined,
+      note: note.trim() || undefined,
       city: selectedCity?.name ?? cityInput.trim(),
       lat: selectedCity?.lat,
       lon: selectedCity?.lon,
@@ -137,9 +139,9 @@ function LogDate() {
       <form onSubmit={submit} className="mt-8 space-y-8">
         <Field label="Activity" required>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {(Object.entries(ACTIVITY_META) as [Activity, { label: string; emoji: string }][]).map(([k, m]) => (
+            {LOG_ACTIVITIES.map((k) => (
               <PickButton key={k} active={activity === k} onClick={() => setActivity(k)}>
-                {m.emoji} {m.label}
+                {ACTIVITY_META[k].emoji} {ACTIVITY_META[k].label}
               </PickButton>
             ))}
           </div>
@@ -246,13 +248,16 @@ function LogDate() {
               </button>
             ))}
           </div>
+        </Field>
+
+        <Field label="💬 The line or move that landed" optional>
           <input
-            value={TURNING_POINTS.includes(turningPoint) ? "" : turningPoint}
-            onChange={(e) => setTurningPoint(e.target.value.slice(0, 24))}
-            placeholder="…or type your own"
-            className="mt-3 w-full rounded-xl bg-input border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+            value={note}
+            onChange={(e) => setNote(e.target.value.slice(0, 140))}
+            placeholder="The exact thing you said or did that won them over — e.g. &quot;joked about my terrible cooking and offered to learn together&quot;"
+            className="w-full rounded-xl bg-input border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
           />
-          <p className="text-xs text-muted-foreground mt-1.5">Anonymous — this powers the community's "why dates work (or don't)" data.</p>
+          <p className="text-xs text-muted-foreground mt-1.5">Anonymous — the best lines become community gold. {note.length > 0 && `${140 - note.length} left`}</p>
         </Field>
 
         <button type="submit" className="w-full rounded-full bg-primary text-primary-foreground py-3 font-semibold hover:opacity-90 transition">Log this date 🎉</button>

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuthState, openAuthModal, signOut } from "@/lib/auth";
 import { useStore, getUserId } from "@/lib/datedata/store";
 import { useCountry } from "@/lib/country";
-import { buildNotifications } from "@/lib/datedata/notifications";
+import { buildNotifications, type Notif } from "@/lib/datedata/notifications";
 
 const NOTIF_TS_KEY = "wad_notif_ts";
 
@@ -30,8 +30,6 @@ const nav = [
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
   const { isReal } = useAuthState();
   const { profile, posts, entries } = useStore();
   const { config } = useCountry();
@@ -46,18 +44,9 @@ export function Header() {
   const unreadCount = notifs.filter((n) => n.countsUnread && n.ts > lastSeen).length;
 
   function openNotifs() {
-    setNotifOpen(true);
     markSeen();
     setLastSeen(Date.now());
   }
-
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, []);
 
   function handleSignIn() {
     openAuthModal("Save your data across devices and join the community.");
@@ -88,45 +77,7 @@ export function Header() {
           ))}
 
           {/* Notification bell */}
-          {myId && (
-            <div ref={notifRef} className="relative ml-1">
-              <button
-                onClick={openNotifs}
-                className="relative p-1.5 rounded-md text-muted-foreground hover:text-foreground transition"
-                title="Notifications"
-              >
-                <Bell className="h-4 w-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold grid place-items-center">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </button>
-              {notifOpen && (
-                <div className="absolute right-0 top-9 z-50 w-80 rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                    <span className="text-sm font-bold">Notifications</span>
-                    {unreadCount > 0 && <span className="text-xs text-primary font-semibold">{unreadCount} new</span>}
-                  </div>
-                  {notifs.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-6">Nothing yet — log a date to get things going.</p>
-                  ) : (
-                    <ul className="max-h-80 overflow-y-auto divide-y divide-border">
-                      {notifs.map((n) => (
-                        <li key={n.id} className="px-4 py-3 hover:bg-muted transition flex items-start gap-2.5" onClick={() => setNotifOpen(false)}>
-                          <span className="text-base leading-none shrink-0 mt-0.5">{n.icon}</span>
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-foreground">{n.title}</p>
-                            {n.sub && <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.sub}</p>}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+          {myId && <NotifBell notifs={notifs} unreadCount={unreadCount} onOpen={openNotifs} />}
 
           {isReal ? (
             <div className="flex items-center gap-2 ml-2 pl-2 border-l border-border">
@@ -151,8 +102,9 @@ export function Header() {
           )}
         </nav>
 
-        {/* Mobile: Log CTA + hamburger */}
-        <div className="flex items-center gap-2 ml-auto md:hidden">
+        {/* Mobile: bell + Log CTA + hamburger */}
+        <div className="flex items-center gap-1.5 ml-auto md:hidden">
+          {myId && <NotifBell notifs={notifs} unreadCount={unreadCount} onOpen={openNotifs} />}
           <Link to="/log" className="rounded-full bg-primary text-primary-foreground text-xs font-bold px-3 py-1.5 hover:opacity-90 transition">
             + Log entry
           </Link>
@@ -194,5 +146,59 @@ export function Header() {
         </div>
       )}
     </header>
+  );
+}
+
+// Reusable notification bell + dropdown (used in both desktop nav and mobile bar)
+function NotifBell({ notifs, unreadCount, onOpen }: { notifs: Notif[]; unreadCount: number; onOpen: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => { setOpen((v) => !v); if (!open) onOpen(); }}
+        className="relative p-1.5 rounded-md text-muted-foreground hover:text-foreground transition"
+        title="Notifications"
+      >
+        <Bell className="h-4 w-4" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold grid place-items-center">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-9 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <span className="text-sm font-bold">Notifications</span>
+            {unreadCount > 0 && <span className="text-xs text-primary font-semibold">{unreadCount} new</span>}
+          </div>
+          {notifs.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">Nothing yet — log a date to get things going.</p>
+          ) : (
+            <ul className="max-h-80 overflow-y-auto divide-y divide-border">
+              {notifs.map((n) => (
+                <li key={n.id} className="px-4 py-3 hover:bg-muted transition flex items-start gap-2.5" onClick={() => setOpen(false)}>
+                  <span className="text-base leading-none shrink-0 mt-0.5">{n.icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-foreground">{n.title}</p>
+                    {n.sub && <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.sub}</p>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

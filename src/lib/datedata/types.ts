@@ -1,4 +1,4 @@
-export type Activity = "food_date" | "movie" | "gift" | "trip" | "coffee" | "other";
+export type Activity = "food_date" | "movie" | "gift" | "trip" | "coffee" | "hiking" | "drinks" | "other";
 export type Mood = 1 | 2 | 3 | 4 | 5; // 5 = amazing, 1 = bad
 export type AgeRange = "18-24" | "25-34" | "35-44" | "45+";
 
@@ -57,12 +57,17 @@ export interface Comment {
 
 export const ACTIVITY_META: Record<Activity, { label: string; emoji: string }> = {
   food_date: { label: "Food Date", emoji: "🍽️" },
-  movie: { label: "Movie", emoji: "🎬" },
-  gift: { label: "Gift", emoji: "🎁" },
-  trip: { label: "Trip", emoji: "✈️" },
   coffee: { label: "Coffee", emoji: "☕" },
+  drinks: { label: "Drinks / Bar", emoji: "🍸" },
+  movie: { label: "Movie", emoji: "🎬" },
+  hiking: { label: "Hiking", emoji: "🥾" },
+  trip: { label: "Trip", emoji: "✈️" },
+  gift: { label: "Gift", emoji: "🎁" }, // retained for existing entries; not in the log picker
   other: { label: "Other", emoji: "💫" },
 };
+
+// Activities offered in the log form (gift removed per product decision)
+export const LOG_ACTIVITIES: Activity[] = ["food_date", "coffee", "drinks", "movie", "hiking", "trip", "other"];
 
 export const MOOD_META: Record<Mood, { label: string; emoji: string }> = {
   5: { label: "Amazing", emoji: "😍" },
