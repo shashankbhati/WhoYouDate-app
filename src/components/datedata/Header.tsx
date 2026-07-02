@@ -1,8 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { Search, Menu, X, LogIn, LogOut, Bell } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuthState, openAuthModal, signOut } from "@/lib/auth";
 import { useStore, getUserId } from "@/lib/datedata/store";
+import { useCountry } from "@/lib/country";
+import { buildNotifications } from "@/lib/datedata/notifications";
 
 const NOTIF_TS_KEY = "wad_notif_ts";
 
@@ -31,18 +33,17 @@ export function Header() {
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const { isReal } = useAuthState();
-  const { profile, posts } = useStore();
+  const { profile, posts, entries } = useStore();
+  const { config } = useCountry();
 
   const myId = typeof window !== "undefined" ? getUserId() : "";
   const [lastSeen, setLastSeen] = useState(() => getLastSeen());
 
-  const newNotifs = posts
-    .filter((p) => p.userId === myId)
-    .flatMap((p) =>
-      p.comments
-        .filter((c) => c.userId !== myId && +new Date(c.createdAt) > lastSeen)
-        .map((c) => ({ postId: p.id, postSnippet: p.content.slice(0, 60), comment: c, postAuthor: p.author }))
-    );
+  const notifs = useMemo(
+    () => buildNotifications(entries, posts, myId, config.currencySymbol),
+    [entries, posts, myId, config.currencySymbol]
+  );
+  const unreadCount = notifs.filter((n) => n.countsUnread && n.ts > lastSeen).length;
 
   function openNotifs() {
     setNotifOpen(true);
@@ -95,27 +96,29 @@ export function Header() {
                 title="Notifications"
               >
                 <Bell className="h-4 w-4" />
-                {newNotifs.length > 0 && (
+                {unreadCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold grid place-items-center">
-                    {newNotifs.length > 9 ? "9+" : newNotifs.length}
+                    {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </button>
               {notifOpen && (
-                <div className="absolute right-0 top-9 z-50 w-72 rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
+                <div className="absolute right-0 top-9 z-50 w-80 rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
                   <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                     <span className="text-sm font-bold">Notifications</span>
-                    <span className="text-xs text-muted-foreground">{newNotifs.length} new</span>
+                    {unreadCount > 0 && <span className="text-xs text-primary font-semibold">{unreadCount} new</span>}
                   </div>
-                  {newNotifs.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-6">No new replies yet.</p>
+                  {notifs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-6">Nothing yet — log a date to get things going.</p>
                   ) : (
-                    <ul className="max-h-64 overflow-y-auto divide-y divide-border">
-                      {newNotifs.map((n, i) => (
-                        <li key={i} className="px-4 py-3 hover:bg-muted transition cursor-pointer" onClick={() => setNotifOpen(false)}>
-                          <p className="text-xs font-semibold text-foreground">u/{n.comment.author} replied</p>
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate">"{n.comment.content}"</p>
-                          <p className="text-[10px] text-muted-foreground/60 mt-1">on: {n.postSnippet}{n.postSnippet.length >= 60 ? "…" : ""}</p>
+                    <ul className="max-h-80 overflow-y-auto divide-y divide-border">
+                      {notifs.map((n) => (
+                        <li key={n.id} className="px-4 py-3 hover:bg-muted transition flex items-start gap-2.5" onClick={() => setNotifOpen(false)}>
+                          <span className="text-base leading-none shrink-0 mt-0.5">{n.icon}</span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-foreground">{n.title}</p>
+                            {n.sub && <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.sub}</p>}
+                          </div>
                         </li>
                       ))}
                     </ul>
