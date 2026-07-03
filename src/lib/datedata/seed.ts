@@ -8,7 +8,7 @@ const CITIES = ["Berlin", "Munich", "Hamburg", "Cologne", "Frankfurt", "Dresden"
 // Export name sets so UI can categorize entries by gender
 export const FEMALE_NAMES_ALL = new Set([
   ...FEMALE_NAMES,
-  "Tabea",
+  "Tabea", "Leoni",
   "Priya", "Neha", "Aditi", "Anjali", "Pooja", "Riya", "Sneha", "Ananya", "Kavya", "Divya", "Ishita", "Simran", "Nisha", "Ayesha", "Sana",
   "Ashley", "Jessica", "Emily", "Olivia", "Emma", "Megan", "Sarah", "Chloe", "Madison", "Brittany", "Taylor", "Amanda", "Lauren", "Kayla", "Samantha",
 ]);
@@ -211,6 +211,24 @@ export function seedEntriesDresden(): Entry[] {
   // Moritz — mid-range, lots of food dates
   for (let i = 0; i < 8; i++) {
     out.push({ id: uid(), userId: "seed_" + uid(), activity: "food_date", amountCents: 9500 + Math.floor(Math.random() * 3000), currency: "EUR", partnerName: "Moritz", mood: 3, meetVia: "friends", secondDate: Math.random() > 0.5 ? "yes" : "no", city: "Dresden", entryDate: new Date(now - i * 86400000 * 4).toISOString(), createdAt: new Date(now - i * 86400000 * 4).toISOString() });
+  }
+  return out;
+}
+
+// Leoni — costliest name to date in Berlin (tops everyone incl. Sven)
+export function seedEntriesLeoni(): Entry[] {
+  const out: Entry[] = [];
+  const now = Date.now();
+  for (let i = 0; i < 12; i++) {
+    out.push({
+      id: uid(), userId: "seed_" + uid(),
+      activity: i % 2 === 0 ? "trip" : "food_date",
+      amountCents: 72000 + Math.floor(Math.random() * 26000), // €720–980/date
+      currency: "EUR", partnerName: "Leoni", mood: 5, meetVia: "hinge",
+      secondDate: "together", city: "Berlin",
+      entryDate: new Date(now - i * 86400000 * 2).toISOString(),
+      createdAt: new Date(now - i * 86400000 * 2).toISOString(),
+    });
   }
   return out;
 }
