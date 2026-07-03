@@ -287,32 +287,41 @@ async function initialize() {
 export async function addEntry(e: Entry) {
   if (typeof window === "undefined") return;
   await ensureAuth();
-  const { data, error } = await supabase
-    .from("entries")
-    .insert({
-      user_id: _userId,
-      activity: e.activity,
-      amount_cents: e.amountCents,
-      currency: e.currency,
-      partner_name: e.partnerName,
-      mood: e.mood,
-      meet_via: e.meetVia ?? null,
-      second_date: e.secondDate ?? null,
-      note: e.note ?? null,
-      city: e.city,
-      ...(e.lat != null ? { lat: e.lat } : {}),
-      ...(e.lon != null ? { lon: e.lon } : {}),
-      ...(e.turningPoint ? { turning_point: e.turningPoint } : {}),
-      ...(e.partnerTag ? { partner_tag: e.partnerTag } : {}),
-      // Stamp the logger's own first name (if set) so we can aggregate
-      // "how much people named X spend" — first-name-only, never shown per-user.
-      ...(_profile?.firstName ? { logger_first_name: _profile.firstName } : {}),
-      entry_date: e.entryDate,
-      created_at: e.createdAt,
-    })
-    .select()
-    .single();
-  if (data && !error) { _entries = [rowToEntry(data), ..._entries]; emit(); }
+
+  // Core columns that always exist.
+  const base = {
+    user_id: _userId,
+    activity: e.activity,
+    amount_cents: e.amountCents,
+    currency: e.currency,
+    partner_name: e.partnerName,
+    mood: e.mood,
+    meet_via: e.meetVia ?? null,
+    second_date: e.secondDate ?? null,
+    note: e.note ?? null,
+    city: e.city,
+    entry_date: e.entryDate,
+    created_at: e.createdAt,
+  };
+  // Newer columns added by migrations — omitted when empty.
+  const optional = {
+    ...(e.lat != null ? { lat: e.lat } : {}),
+    ...(e.lon != null ? { lon: e.lon } : {}),
+    ...(e.turningPoint ? { turning_point: e.turningPoint } : {}),
+    ...(e.partnerTag ? { partner_tag: e.partnerTag } : {}),
+    // First-name-only, never shown per-user — powers "how much people named X spend".
+    ...(_profile?.firstName ? { logger_first_name: _profile.firstName } : {}),
+  };
+
+  let res = await supabase.from("entries").insert({ ...base, ...optional }).select().single();
+  // If an optional column is missing (a migration hasn't run yet), Supabase
+  // rejects the whole row. Retry with core columns so the date is never lost.
+  if (res.error && Object.keys(optional).length > 0) {
+    console.warn("[addEntry] retrying without optional columns:", res.error.message);
+    res = await supabase.from("entries").insert(base).select().single();
+  }
+  if (res.data && !res.error) { _entries = [rowToEntry(res.data), ..._entries]; emit(); }
+  else if (res.error) { console.error("[addEntry] insert failed:", res.error); }
 }
 
 // ── Pending entry (survives the login/OAuth redirect) ─────────────────────────
