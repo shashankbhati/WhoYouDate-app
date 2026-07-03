@@ -7,7 +7,8 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -16,7 +17,7 @@ import { Toaster } from "../components/ui/sonner";
 import { AuthModal } from "../components/auth/AuthModal";
 import { UsernameSetup } from "../components/auth/UsernameSetup";
 import { useAuthState } from "../lib/auth";
-import { useStore } from "../lib/datedata/store";
+import { useStore, takePendingEntry, addEntry } from "../lib/datedata/store";
 
 function NotFoundComponent() {
   return (
@@ -175,8 +176,22 @@ function Footer() {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const { isReal, modal } = useAuthState();
-  const { profile, profileChecked } = useStore();
+  const { profile, profileChecked, loading: storeLoading } = useStore();
   const [showUsernameSetup, setShowUsernameSetup] = useState(false);
+  const flushedRef = useRef(false);
+
+  // Auto-save a date the user filled out before logging in. The entry was
+  // stashed in localStorage by the log form; once auth completes (including
+  // after the Google OAuth redirect), we persist it so it's never lost.
+  useEffect(() => {
+    if (isReal && !storeLoading && !flushedRef.current) {
+      const pending = takePendingEntry();
+      if (pending) {
+        flushedRef.current = true;
+        addEntry(pending).then(() => toast.success("Your date was saved 🎉"));
+      }
+    }
+  }, [isReal, storeLoading]);
 
   // Show username setup only for a real (logged-in) user whose profile has been
   // confirmed-fetched and genuinely doesn't exist yet — i.e. brand new accounts.

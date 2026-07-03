@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { addEntry, getUserId, getProfile } from "@/lib/datedata/store";
+import { addEntry, getUserId, getProfile, savePendingEntry } from "@/lib/datedata/store";
 import { ACTIVITY_META, LOG_ACTIVITIES, MOOD_META, type Activity, type Mood } from "@/lib/datedata/types";
 import { detectPII } from "@/lib/datedata/pii";
 import { isRealUser, openAuthModal } from "@/lib/auth";
@@ -101,10 +101,7 @@ function LogDate() {
 
   function submit(ev: React.FormEvent) {
     ev.preventDefault();
-    if (!isRealUser()) {
-      openAuthModal("Sign in to log your dates and track your history.");
-      return;
-    }
+    // Validate first, so we only ever stash a complete, valid entry.
     if (!activity) return toast.error("Pick an activity.");
     if (!amount || isNaN(+amount)) return toast.error("Enter an amount.");
     if (!partner.trim()) return toast.error("Add a partner first name.");
@@ -112,7 +109,8 @@ function LogDate() {
     if (!mood) return toast.error("Pick an overall vibe.");
     const pii = detectPII(partner);
     if (pii) return toast.error(`Looks like you included a ${pii}. Use a first name only.`);
-    addEntry({
+
+    const entry = {
       id: Math.random().toString(36).slice(2),
       userId: getUserId(),
       activity,
@@ -130,8 +128,18 @@ function LogDate() {
       lon: selectedCity?.lon,
       entryDate: new Date().toISOString(),
       createdAt: new Date().toISOString(),
-    });
-    toast.success("Date logged anonymously 🎉");
+    };
+
+    // Not logged in yet: stash the entry so it survives the login/OAuth
+    // redirect, then prompt sign-in. It's auto-saved after auth (see __root).
+    if (!isRealUser()) {
+      savePendingEntry(entry);
+      openAuthModal("Sign in to save this date and track your history.");
+      return;
+    }
+
+    addEntry(entry);
+    toast.success("Date logged 🎉");
     navigate({ to: "/stats" });
   }
 

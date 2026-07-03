@@ -302,6 +302,25 @@ export async function addEntry(e: Entry) {
   if (data && !error) { _entries = [rowToEntry(data), ..._entries]; emit(); }
 }
 
+// ── Pending entry (survives the login/OAuth redirect) ─────────────────────────
+// When a logged-out user submits the log form, we stash the entry here, prompt
+// login, then flush it after auth completes (see __root.tsx). This prevents the
+// "I filled the form, logged in, and my date vanished" data loss.
+const PENDING_ENTRY_KEY = "wad_pending_entry";
+
+export function savePendingEntry(e: Entry) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(PENDING_ENTRY_KEY, JSON.stringify(e)); } catch { /* quota/private mode */ }
+}
+
+export function takePendingEntry(): Entry | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(PENDING_ENTRY_KEY);
+  if (!raw) return null;
+  localStorage.removeItem(PENDING_ENTRY_KEY);
+  try { return JSON.parse(raw) as Entry; } catch { return null; }
+}
+
 export async function deleteEntry(id: string) {
   if (typeof window === "undefined") return;
   await ensureAuth();
