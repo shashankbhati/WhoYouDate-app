@@ -828,6 +828,19 @@ function NameAnalyticsPanel({ entries, currency, featuredNames, seed }: { entrie
     return { insufficient: false as const, count, avgSpend, happyRate, secondDateRate, avgMood, cities, activities, meetVias, moodDist, scope, hasMixedCurrencies };
   }, [entries, query, cityQuery, currency]);
 
+  // How much people who ARE named `query` spend when THEY date — aggregated from
+  // their own logged entries (loggerFirstName), first-name-only, min-sample
+  // guarded so it never resolves to a single identifiable person.
+  const spenderStat = useMemo(() => {
+    if (!query) return null;
+    const q = query.toLowerCase();
+    const rows = entries.filter((e) => e.loggerFirstName && e.loggerFirstName.toLowerCase() === q);
+    if (rows.length < 5) return null;
+    const total = rows.reduce((a, e) => a + convertCents(e.amountCents, e.currency, currency), 0);
+    const approx = rows.some((e) => e.currency !== currency);
+    return { count: rows.length, avg: total / rows.length, approx };
+  }, [entries, query, currency]);
+
   function search(name: string) {
     const trimmed = name.trim();
     setInput(trimmed);
@@ -900,6 +913,21 @@ function NameAnalyticsPanel({ entries, currency, featuredNames, seed }: { entrie
           <p className="text-3xl mb-3">🔍</p>
           <p className="font-semibold">search any name above</p>
           <p className="text-sm text-muted-foreground mt-1">results pull from the entire global ledger</p>
+        </div>
+      )}
+
+      {/* How much people named X spend when THEY date (self-reported, anonymous) */}
+      {query && spenderStat && (
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 flex items-center gap-3">
+          <span className="text-2xl shrink-0">💰</span>
+          <div className="min-w-0">
+            <p className="text-sm">
+              People named <span className="font-bold">{query}</span> spend{" "}
+              <span className="font-bold text-primary">{spenderStat.approx ? "~" : ""}{currencySymbol(currency)}{(spenderStat.avg / 100).toFixed(0)}</span>{" "}
+              per date, on average — when they're the one dating.
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Anonymous · self-reported by {spenderStat.count} people named {query}</p>
+          </div>
         </div>
       )}
 

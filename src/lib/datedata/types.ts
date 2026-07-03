@@ -10,6 +10,7 @@ export interface Entry {
   currency: string;
   partnerName: string;
   partnerTag?: string; // private marker (emoji) to tell two same-named partners apart — only in the owner's own stats
+  loggerFirstName?: string; // the logger's own first name (denormalized) — powers anonymous "how much people named X spend"
   mood: Mood;
   meetVia?: string;
   secondDate?: "yes" | "no" | "together";
@@ -25,6 +26,7 @@ export interface Entry {
 export interface Profile {
   id: string;
   displayName: string;
+  firstName?: string; // hidden — never shown publicly; only feeds anonymous first-name-aggregate spend stats
   partnerDisplayName?: string;
   ageRange: AgeRange;
   city: string;

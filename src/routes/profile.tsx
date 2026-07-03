@@ -106,6 +106,7 @@ function ProfilePage() {
                 ) : (
                   <div className="grid sm:grid-cols-2 gap-3">
                     <input value={draft.displayName} onChange={(e) => setDraft({ ...draft, displayName: e.target.value })} placeholder="Display name" className="rounded-lg bg-input border border-border px-3 py-2 text-sm" />
+                    <input value={draft.firstName ?? ""} onChange={(e) => setDraft({ ...draft, firstName: e.target.value.slice(0, 20) || undefined })} placeholder="First name (hidden)" className="rounded-lg bg-input border border-border px-3 py-2 text-sm" />
                     <input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="City" className="rounded-lg bg-input border border-border px-3 py-2 text-sm" />
                     <input value={draft.country} onChange={(e) => setDraft({ ...draft, country: e.target.value })} placeholder="Country" className="rounded-lg bg-input border border-border px-3 py-2 text-sm" />
                     <select value={draft.ageRange} onChange={(e) => setDraft({ ...draft, ageRange: e.target.value as AgeRange })} className="rounded-lg bg-input border border-border px-3 py-2 text-sm">

@@ -11,6 +11,7 @@ interface Props {
 
 export function UsernameSetup({ open, onDone }: Props) {
   const [username, setUsername] = useState("");
+  const [firstName, setFirstName] = useState("");
   const [loading, setLoading] = useState(false);
 
   if (!open) return null;
@@ -28,6 +29,7 @@ export function UsernameSetup({ open, onDone }: Props) {
       await saveProfile({
         id: user?.id ?? "",
         displayName: name,
+        firstName: firstName.trim() || undefined,
         ageRange: "25-34",
         city: "Berlin",
         country: "Germany",
@@ -64,6 +66,20 @@ export function UsernameSetup({ open, onDone }: Props) {
               className="w-full rounded-xl bg-input border border-border pl-9 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
             />
           </div>
+
+          <div className="rounded-xl border border-border bg-muted/30 p-3">
+            <label className="text-xs font-semibold block mb-1">Your first name <span className="text-muted-foreground font-normal">(optional)</span></label>
+            <input
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value.slice(0, 20))}
+              placeholder="e.g. Sara"
+              className="w-full rounded-lg bg-input border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
+              🔒 Hidden — never shown publicly. Only used to power anonymous "how much do people named Sara spend" stats. First name only.
+            </p>
+          </div>
+
           <button
             type="submit"
             disabled={loading || username.trim().length < 2}

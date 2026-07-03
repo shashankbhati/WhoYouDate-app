@@ -29,6 +29,7 @@ function rowToEntry(r: any): Entry {
     currency: r.currency,
     partnerName: r.partner_name,
     partnerTag: r.partner_tag ?? undefined,
+    loggerFirstName: r.logger_first_name ?? undefined,
     mood: r.mood,
     meetVia: r.meet_via ?? undefined,
     secondDate: r.second_date ?? undefined,
@@ -264,6 +265,7 @@ async function initialize() {
       _profile = {
         id: profileRow.user_id,
         displayName: profileRow.display_name,
+        firstName: profileRow.first_name ?? undefined,
         partnerDisplayName: profileRow.partner_display_name ?? undefined,
         ageRange: profileRow.age_range,
         city: profileRow.city,
@@ -302,6 +304,9 @@ export async function addEntry(e: Entry) {
       ...(e.lon != null ? { lon: e.lon } : {}),
       ...(e.turningPoint ? { turning_point: e.turningPoint } : {}),
       ...(e.partnerTag ? { partner_tag: e.partnerTag } : {}),
+      // Stamp the logger's own first name (if set) so we can aggregate
+      // "how much people named X spend" — first-name-only, never shown per-user.
+      ...(_profile?.firstName ? { logger_first_name: _profile.firstName } : {}),
       entry_date: e.entryDate,
       created_at: e.createdAt,
     })
@@ -457,7 +462,9 @@ export async function saveProfile(p: Profile) {
     .maybeSingle();
   if (taken) throw new Error("Username already taken");
   await supabase.from("profiles").upsert(
-    { user_id: _userId, display_name: p.displayName, partner_display_name: p.partnerDisplayName ?? null, age_range: p.ageRange, city: p.city, country: p.country, relationship_stage: p.relationshipStage },
+    // first_name only sent when set, so profile saves keep working even before
+    // the migration adds the column.
+    { user_id: _userId, display_name: p.displayName, ...(p.firstName ? { first_name: p.firstName } : {}), partner_display_name: p.partnerDisplayName ?? null, age_range: p.ageRange, city: p.city, country: p.country, relationship_stage: p.relationshipStage },
     { onConflict: "user_id" }
   );
   _profile = p;
