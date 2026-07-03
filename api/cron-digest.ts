@@ -23,6 +23,17 @@ const WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 interface EntryRow { partner_name: string; city: string; amount_cents: number; mood: number; second_date: string | null; activity: string; created_at: string; }
 interface SubRow { id: string; email: string; watch_name: string; wants_digest: boolean; unsubscribe_token: string; }
 
+// Escape user-derived text before putting it in email HTML — prevents HTML/link
+// injection (e.g. a malicious partner name landing in every subscriber's inbox).
+function esc(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -39,21 +50,22 @@ function unsubFooter(token: string): string {
 }
 
 function digestHtml(opts: { trending: { name: string; count: number }[]; weekCount: number; topActivity: string | null; token: string }): string {
-  const list = opts.trending.map((t, i) => `<li><b>${i + 1}. ${t.name}</b> — ${t.count} new date${t.count !== 1 ? "s" : ""}</li>`).join("");
+  const list = opts.trending.map((t, i) => `<li><b>${i + 1}. ${esc(t.name)}</b> — ${t.count} new date${t.count !== 1 ? "s" : ""}</li>`).join("");
   return `<div style="font-family:-apple-system,Segoe UI,sans-serif;max-width:520px;margin:0 auto">
     <h2 style="color:#e05533">Fresh on WhoAmIDating 💘</h2>
     <p><b>${opts.weekCount}</b> new dates were logged in the last couple days.</p>
     ${opts.trending.length ? `<h3>🔥 Trending names</h3><ul>${list}</ul>` : ""}
-    ${opts.topActivity ? `<p>💡 <b>${opts.topActivity}</b> dates are leading to the most second dates right now.</p>` : ""}
+    ${opts.topActivity ? `<p>💡 <b>${esc(opts.topActivity)}</b> dates are leading to the most second dates right now.</p>` : ""}
     <p><a href="${SITE_URL}" style="display:inline-block;background:#e05533;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:600">Search a name →</a></p>
     ${unsubFooter(opts.token)}
   </div>`;
 }
 
 function watchHtml(opts: { name: string; count: number; token: string }): string {
+  const name = esc(opts.name);
   return `<div style="font-family:-apple-system,Segoe UI,sans-serif;max-width:520px;margin:0 auto">
-    <h2 style="color:#e05533">New activity for "${opts.name}" 👀</h2>
-    <p><b>${opts.count}</b> new date${opts.count !== 1 ? "s were" : " was"} logged recently with someone named <b>${opts.name}</b>.</p>
+    <h2 style="color:#e05533">New activity for "${name}" 👀</h2>
+    <p><b>${opts.count}</b> new date${opts.count !== 1 ? "s were" : " was"} logged recently with someone named <b>${name}</b>.</p>
     <p style="color:#666">Anonymous, as always — never who logged it.</p>
     <p><a href="${SITE_URL}" style="display:inline-block;background:#e05533;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:600">See what people say →</a></p>
     ${unsubFooter(opts.token)}
@@ -61,7 +73,8 @@ function watchHtml(opts: { name: string; count: number; token: string }): string
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Reject if the secret is unset (never allow "Bearer undefined" to pass).
+  if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
