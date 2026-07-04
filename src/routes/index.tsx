@@ -33,7 +33,7 @@ const FEATURED_NAMES: Record<CountryCode, string[]> = {
 
 const BAR_HEIGHT = 132; // px — tall enough to read, compact enough to sit side-by-side
 
-function BarChart({ data, highlightFirst = true, format }: { data: { name: string; value: number }[]; highlightFirst?: boolean; format?: (v: number) => string }) {
+function BarChart({ data, highlightFirst = true, format, onNameClick }: { data: { name: string; value: number }[]; highlightFirst?: boolean; format?: (v: number) => string; onNameClick?: (name: string) => void }) {
   const max = Math.max(1, ...data.map((d) => d.value));
   const fmt = format ?? ((v: number) => String(Math.round(v)));
   const cols = Math.max(data.length, 1);
@@ -48,15 +48,24 @@ function BarChart({ data, highlightFirst = true, format }: { data: { name: strin
           // visible floor so no bar ever looks empty/broken.
           const barH = Math.max(Math.round((d.value / max) * (BAR_HEIGHT - 24)), 14);
           const isTop = highlightFirst && i === 0;
-          return (
-            <div key={d.name} className="flex flex-col items-center justify-end h-full">
+          const bar = (
+            <>
               <span className={`text-[10px] font-bold leading-none mb-1 ${isTop ? "text-primary" : "text-muted-foreground"}`}>
                 {fmt(d.value)}
               </span>
               <div
-                className={`w-full rounded-t-md transition-all ${isTop ? "bg-primary" : "bg-primary/30"}`}
+                className={`w-full rounded-t-md transition-all ${isTop ? "bg-primary" : "bg-primary/30"} ${onNameClick ? "group-hover:opacity-80" : ""}`}
                 style={{ height: barH }}
               />
+            </>
+          );
+          return onNameClick ? (
+            <button key={d.name} onClick={() => onNameClick(d.name)} className="group flex flex-col items-center justify-end h-full cursor-pointer">
+              {bar}
+            </button>
+          ) : (
+            <div key={d.name} className="flex flex-col items-center justify-end h-full">
+              {bar}
             </div>
           );
         })}
@@ -64,7 +73,11 @@ function BarChart({ data, highlightFirst = true, format }: { data: { name: strin
       {/* Labels below bars */}
       <div className="grid gap-2 mt-1.5" style={gridCols}>
         {data.map((d) => (
-          <span key={d.name} className="text-xs text-muted-foreground truncate text-center block">{d.name}</span>
+          onNameClick ? (
+            <button key={d.name} onClick={() => onNameClick(d.name)} className="text-xs font-semibold text-primary hover:underline truncate text-center block">{d.name}</button>
+          ) : (
+            <span key={d.name} className="text-xs text-muted-foreground truncate text-center block">{d.name}</span>
+          )
         ))}
       </div>
     </div>
@@ -290,8 +303,15 @@ function Home() {
         </div>
       )}
 
+      {/* Tap-a-name nudge */}
+      {!loading && (
+        <p className="mt-6 -mb-2 text-center text-sm text-muted-foreground">
+          👆 Tap any name below to see what dating them is really like
+        </p>
+      )}
+
       {/* Costliest names + Trending — side by side */}
-      {!loading && <div className="mt-6 grid gap-4 md:grid-cols-2">
+      {!loading && <div className="mt-4 grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-xs font-bold tracking-wider">💸 COSTLIEST NAMES TO DATE</h2>
@@ -307,7 +327,7 @@ function Home() {
               ))}
             </div>
           </div>
-          {costliest.length > 0 ? <BarChart data={costliest} format={(v) => `${config.currencySymbol}${(v / 100).toFixed(0)}`} /> : <p className="text-sm text-muted-foreground py-6 text-center">Need 3+ entries per name.</p>}
+          {costliest.length > 0 ? <BarChart data={costliest} format={(v) => `${config.currencySymbol}${(v / 100).toFixed(0)}`} onNameClick={(n) => runHeroSearch(n)} /> : <p className="text-sm text-muted-foreground py-6 text-center">Need 3+ entries per name.</p>}
           <div className="flex items-center justify-between mt-2">
             <p className="text-xs text-muted-foreground">Avg {config.currencySymbol}/date. Min 3 entries per name.</p>
             {costliest.length > 0 && (
@@ -336,7 +356,7 @@ function Home() {
               ))}
             </div>
           </div>
-          <BarChart data={trendingPartner} format={(v) => partnerMetric === "cost" ? `${config.currencySymbol}${(v / 100).toFixed(0)}` : partnerMetric === "happy" ? `${Math.round(v)}%` : String(Math.round(v))} />
+          <BarChart data={trendingPartner} format={(v) => partnerMetric === "cost" ? `${config.currencySymbol}${(v / 100).toFixed(0)}` : partnerMetric === "happy" ? `${Math.round(v)}%` : String(Math.round(v))} onNameClick={(n) => runHeroSearch(n)} />
           <div className="flex justify-end mt-2">
             <button
               onClick={() => shareTrendingCard(trendingPartner, partnerMetric, config.currencySymbol)}
@@ -1039,6 +1059,12 @@ function NameAnalyticsPanel({ entries, currency, featuredNames, seed }: { entrie
               </div>
             </div>
           </div>
+
+          {/* Contextual log CTA — they're engaged now, so ask */}
+          <Link to="/log" className="flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 hover:bg-primary/10 transition">
+            <span className="text-sm font-semibold">Curious how <em>you</em> compare? Log your last date to see your own stats.</span>
+            <span className="shrink-0 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold">Log a date →</span>
+          </Link>
 
           {/* Watch this name — retention hook */}
           <NotifyOptIn mode="watch" watchName={query} />
