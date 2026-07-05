@@ -31,6 +31,13 @@ const FEATURED_NAMES: Record<CountryCode, string[]> = {
   US: ["Ashley", "Tyler", "Emma", "Jordan"],
 };
 
+// Sensible "last date cost" brackets per currency (dates cost very different
+// amounts across countries), used by the "How do you compare?" tap hook.
+const RANGES_BY_CCY: Record<string, number[]> = {
+  EUR: [20, 50, 100], USD: [25, 60, 120], GBP: [20, 45, 90], CHF: [20, 50, 100],
+  INR: [500, 1500, 3000],
+};
+
 const BAR_HEIGHT = 132; // px — tall enough to read, compact enough to sit side-by-side
 
 function BarChart({ data, highlightFirst = true, format, onNameClick }: { data: { name: string; value: number }[]; highlightFirst?: boolean; format?: (v: number) => string; onNameClick?: (name: string) => void }) {
@@ -87,6 +94,67 @@ function BarChart({ data, highlightFirst = true, format, onNameClick }: { data: 
 // Skeleton pulse block
 function Skeleton({ className = "", style }: { className?: string; style?: React.CSSProperties }) {
   return <div className={`animate-pulse rounded-lg bg-muted ${className}`} style={style} />;
+}
+
+// "How do you compare?" — one-tap hook that turns a passive scroller into an
+// engaged user by giving an instant, personal result (no typing).
+function CompareHook({ entries, currency, currencySymbol }: { entries: ReturnType<typeof useStore>["entries"]; currency: string; currencySymbol: string }) {
+  const [picked, setPicked] = useState<number | null>(null);
+  const bounds = RANGES_BY_CCY[currency] ?? RANGES_BY_CCY.EUR;
+  const [a, b, c] = bounds;
+  const ranges = [
+    { label: `under ${currencySymbol}${a}`, mid: a * 0.5 },
+    { label: `${currencySymbol}${a}–${b}`, mid: (a + b) / 2 },
+    { label: `${currencySymbol}${b}–${c}`, mid: (b + c) / 2 },
+    { label: `${currencySymbol}${c}+`, mid: c * 1.5 },
+  ];
+
+  let pct: number | null = null;
+  if (picked !== null) {
+    const midCents = ranges[picked].mid * 100;
+    const amounts = entries.map((e) => convertCents(e.amountCents, e.currency, currency)).filter((v) => v > 0);
+    if (amounts.length >= 20) pct = Math.round((amounts.filter((v) => v < midCents).length / amounts.length) * 100);
+  }
+
+  return (
+    <section className="mt-4 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-transparent p-5">
+      <h2 className="font-bold text-lg">💸 How do you compare?</h2>
+      <p className="text-sm text-muted-foreground mt-0.5 mb-3">How much did your last date cost? Tap one 👇</p>
+      <div className="flex flex-wrap gap-2">
+        {ranges.map((r, i) => (
+          <button
+            key={i}
+            onClick={() => setPicked(i)}
+            className={`px-4 py-2.5 rounded-full border text-sm font-semibold transition ${picked === i ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:border-primary hover:text-primary"}`}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+      {picked !== null && (
+        <div className="mt-4 rounded-xl bg-card border border-border p-4">
+          {pct === null ? (
+            <p className="text-sm">You're in 🎉 Not enough community data here yet to compare — help build it by logging your dates.</p>
+          ) : pct >= 50 ? (
+            <p className="text-sm">You spend <span className="font-bold text-primary">more than {pct}%</span> of daters here 👀</p>
+          ) : (
+            <p className="text-sm">You're <span className="font-bold text-primary">more budget-friendly than {100 - pct}%</span> of daters here 💸</p>
+          )}
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button
+              onClick={() => document.getElementById("community-charts")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              className="rounded-full bg-primary text-primary-foreground px-4 py-1.5 text-xs font-semibold hover:opacity-90"
+            >
+              🔍 Now tap a name to explore
+            </button>
+            <Link to="/log" className="rounded-full border border-border px-4 py-1.5 text-xs font-semibold hover:border-primary transition">
+              Log your dates →
+            </Link>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }
 
 function Home() {
@@ -257,6 +325,9 @@ function Home() {
         </div>
       </section>
 
+      {/* How do you compare? — one-tap engagement hook */}
+      <CompareHook entries={displayEntries} currency={config.defaultCurrency} currencySymbol={config.currencySymbol} />
+
       {/* Feature cards */}
       <section className="grid gap-px bg-border border border-border rounded-2xl overflow-hidden md:grid-cols-3 mb-6">
         {[
@@ -311,7 +382,7 @@ function Home() {
       )}
 
       {/* Costliest names + Trending — side by side */}
-      {!loading && <div className="mt-4 grid gap-4 md:grid-cols-2">
+      {!loading && <div id="community-charts" className="mt-4 grid gap-4 md:grid-cols-2 scroll-mt-20">
         <section className="rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-xs font-bold tracking-wider">💸 COSTLIEST NAMES TO DATE</h2>
