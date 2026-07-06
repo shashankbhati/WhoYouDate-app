@@ -23,6 +23,7 @@ function markSeen() {
 
 const nav = [
   { to: "/", label: "Feed" },
+  { to: "/plan", label: "Plan a date" },
   { to: "/stats", label: "Your ledger" },
   { to: "/log", label: "Log entry" },
   { to: "/profile", label: "Profile" },

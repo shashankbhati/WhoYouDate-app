@@ -1,0 +1,514 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { useStore } from "@/lib/datedata/store";
+import { useDatePlanStore, venuesForCity, submitReview } from "@/lib/dateplan/store";
+import { buildPlan } from "@/lib/dateplan/engine";
+import { nameSignal } from "@/lib/dateplan/nameStats";
+import { getWeather } from "@/lib/dateplan/weather";
+import { hasCuratedTemplate } from "@/lib/dateplan/templates";
+import {
+  TIME_META,
+  LEVEL_META,
+  REWARD_LABEL,
+  type TimeOfDay,
+  type AgeRange,
+  type DatePlan,
+  type Move,
+} from "@/lib/dateplan/types";
+import { toast } from "sonner";
+
+export const Route = createFileRoute("/plan")({
+  head: () => ({
+    meta: [
+      { title: "Date Planner — Plan the Perfect Date in Dresden | WhoAmIDating" },
+      {
+        name: "description",
+        content:
+          "Get a full date roadmap for Dresden — where to go, what to ask, how long to stay, and your next move rated by risk and reward. Built from real dating data, not guesswork.",
+      },
+    ],
+  }),
+  component: PlanPage,
+});
+
+const TODS: TimeOfDay[] = ["morning", "afternoon", "evening", "night"];
+const AGES: AgeRange[] = ["18-24", "25-34", "35-44", "45+"];
+
+// Known coords for our launch city so weather works with zero clicks.
+const DRESDEN = { name: "Dresden", lat: 51.0504, lon: 13.7373 };
+
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  address: {
+    city?: string;
+    town?: string;
+    village?: string;
+    county?: string;
+    state?: string;
+    country?: string;
+  };
+}
+function cityNameFrom(r: NominatimResult): string {
+  return (
+    r.address.city ??
+    r.address.town ??
+    r.address.village ??
+    r.address.county ??
+    r.display_name.split(",")[0].trim()
+  );
+}
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function PlanPage() {
+  const { entries } = useStore();
+  const { venues } = useDatePlanStore();
+
+  const [name, setName] = useState("");
+  const [city, setCity] = useState(DRESDEN.name);
+  const [coords, setCoords] = useState<{ lat: number; lon: number }>({
+    lat: DRESDEN.lat,
+    lon: DRESDEN.lon,
+  });
+  const [date, setDate] = useState(todayISO());
+  const [tod, setTod] = useState<TimeOfDay>("evening");
+  const [age, setAge] = useState<AgeRange>("25-34");
+
+  const [plan, setPlan] = useState<DatePlan | null>(null);
+  const [building, setBuilding] = useState(false);
+  const [weatherLine, setWeatherLine] = useState<string | null>(null);
+
+  // City autocomplete (Nominatim — same as the log form)
+  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [showSug, setShowSug] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  function handleCityChange(val: string) {
+    setCity(val);
+    clearTimeout(searchTimer.current);
+    if (val.length < 2) {
+      setSuggestions([]);
+      setShowSug(false);
+      return;
+    }
+    searchTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val)}&format=json&limit=6&addressdetails=1`,
+        );
+        setSuggestions(await res.json());
+        setShowSug(true);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 400);
+  }
+  function pickCity(r: NominatimResult) {
+    setCity(cityNameFrom(r));
+    setCoords({ lat: parseFloat(r.lat), lon: parseFloat(r.lon) });
+    setSuggestions([]);
+    setShowSug(false);
+  }
+
+  async function build() {
+    setBuilding(true);
+    setWeatherLine(null);
+    const input = { partnerName: name, city, date, timeOfDay: tod, ageRange: age };
+    const signal = nameSignal(entries, name);
+    const weather = await getWeather(coords.lat, coords.lon, date, tod).catch(() => null);
+    if (weather) setWeatherLine(`${weather.emoji} ${weather.summary} in ${city}`);
+    const cityVenues = venuesForCity(city);
+    setPlan(buildPlan(input, cityVenues.length ? cityVenues : venues, signal, weather));
+    setBuilding(false);
+  }
+
+  // Auto-build a default Dresden plan on first load so the page is never blank
+  // (same "never show an empty page" principle as the ledger).
+  const didInit = useRef(false);
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+    build();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <main className="mx-auto max-w-3xl px-4 py-10">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold">Plan the date 🗺️</h1>
+          <p className="text-muted-foreground mt-1">
+            A full roadmap — where to go, what to ask, and your next move rated by risk & reward.
+          </p>
+        </div>
+      </div>
+
+      {/* ── Inputs ── */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          build();
+        }}
+        className="mt-6 rounded-2xl border border-border bg-card p-5 space-y-5"
+      >
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-semibold block mb-2">
+              Your date's first name{" "}
+              <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Lena, Priya…"
+              className="w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40"
+            />
+          </div>
+          <div className="relative">
+            <label className="text-sm font-semibold block mb-2">City</label>
+            <input
+              value={city}
+              onChange={(e) => handleCityChange(e.target.value)}
+              onFocus={() => suggestions.length > 0 && setShowSug(true)}
+              onBlur={() => setTimeout(() => setShowSug(false), 200)}
+              placeholder="Search a city…"
+              className="w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40"
+            />
+            {showSug && suggestions.length > 0 && (
+              <ul className="absolute z-20 w-full mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden">
+                {suggestions.map((r) => (
+                  <li key={r.place_id}>
+                    <button
+                      type="button"
+                      onMouseDown={() => pickCity(r)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-muted transition"
+                    >
+                      <div className="text-sm font-medium">{cityNameFrom(r)}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {[r.address.state, r.address.country].filter(Boolean).join(", ")}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-semibold block mb-2">Date</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-semibold block mb-2">Age range</label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {AGES.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setAge(a)}
+                  className={`rounded-lg border py-2.5 text-xs font-semibold transition ${age === a ? "border-primary bg-primary/10 text-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold block mb-2">Time of day</label>
+          <div className="grid grid-cols-4 gap-2">
+            {TODS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTod(t)}
+                className={`rounded-xl border py-3 flex flex-col items-center gap-1 transition ${tod === t ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
+              >
+                <span className="text-xl">{TIME_META[t].emoji}</span>
+                <span className="text-xs font-medium">{TIME_META[t].label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={building}
+          className="w-full rounded-full bg-primary text-primary-foreground py-3 font-semibold hover:opacity-90 transition disabled:opacity-60"
+        >
+          {building ? "Building your plan…" : plan ? "Rebuild plan 🔄" : "Build my date plan ✨"}
+        </button>
+      </form>
+
+      {!hasCuratedTemplate(city) && (
+        <p className="mt-3 text-xs text-muted-foreground text-center">
+          Dresden is fully curated. Other cities use a general roadmap for now — more cities coming.
+        </p>
+      )}
+      {weatherLine && (
+        <p className="mt-3 text-sm text-center text-muted-foreground">{weatherLine}</p>
+      )}
+
+      {/* ── The plan ── */}
+      {plan && (
+        <PlanView
+          plan={plan}
+          input={{ partnerName: name, city, date, timeOfDay: tod, ageRange: age }}
+        />
+      )}
+    </main>
+  );
+}
+
+function PlanView({
+  plan,
+  input,
+}: {
+  plan: DatePlan;
+  input: {
+    partnerName: string;
+    city: string;
+    date: string;
+    timeOfDay: TimeOfDay;
+    ageRange: AgeRange;
+  };
+}) {
+  // Track which move the user picked at each decision point (feeds the review loop).
+  const [chosen, setChosen] = useState<Record<number, Move>>({});
+
+  return (
+    <section className="mt-8">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold">{plan.headline}</h2>
+        <p className="text-muted-foreground mt-1 text-sm max-w-xl mx-auto">{plan.subline}</p>
+      </div>
+
+      <ol className="mt-6 space-y-4">
+        {plan.steps.map((step) =>
+          step.type === "stop" ? (
+            <li key={step.order} className="rounded-2xl border border-border bg-card p-5">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl leading-none shrink-0">{step.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-bold">{step.title}</h3>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      ~{step.minutes} min
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">{step.scene}</p>
+
+                  {step.venue && (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                      {step.venue.rating != null && (
+                        <span className="text-amber-500 font-semibold">
+                          ★ {step.venue.rating.toFixed(1)}
+                        </span>
+                      )}
+                      {step.venue.priceTier != null && (
+                        <span className="text-muted-foreground">
+                          {"€".repeat(step.venue.priceTier)}
+                        </span>
+                      )}
+                      {step.venue.area && (
+                        <span className="text-muted-foreground">📍 {step.venue.area}</span>
+                      )}
+                      {step.venue.seed && (
+                        <span className="text-muted-foreground/70 italic">starter pick</span>
+                      )}
+                    </div>
+                  )}
+                  {step.venue?.note && (
+                    <p className="text-xs text-muted-foreground mt-1">💡 {step.venue.note}</p>
+                  )}
+
+                  {step.weatherNote && (
+                    <p className="mt-2 text-xs rounded-lg bg-muted px-3 py-2">{step.weatherNote}</p>
+                  )}
+
+                  {step.question && (
+                    <div className="mt-3 rounded-xl bg-primary/5 border border-primary/15 px-3 py-2.5">
+                      <p className="text-[11px] uppercase tracking-wider font-bold text-primary/80">
+                        Ask here
+                      </p>
+                      <p className="text-sm mt-0.5">“{step.question.text}”</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </li>
+          ) : (
+            <li
+              key={step.order}
+              className="rounded-2xl border border-dashed border-primary/40 bg-primary/[0.03] p-5"
+            >
+              <p className="font-bold text-sm">🎯 {step.prompt}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Pick the one that fits the vibe — each is rated by risk and payoff.
+              </p>
+              <div className="mt-3 grid gap-2.5">
+                {step.options.map((m) => {
+                  const isPicked = chosen[step.order]?.id === m.id;
+                  const lm = LEVEL_META[m.risk];
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() =>
+                        setChosen((c) => ({ ...c, [step.order]: isPicked ? undefined! : m }))
+                      }
+                      className={`text-left rounded-xl border p-3.5 transition ${isPicked ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{lm.dot}</span>
+                        <span className={`text-xs font-bold ${lm.color}`}>{lm.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          · {REWARD_LABEL[m.reward]}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium mt-1.5">{m.label}</p>
+                      {m.hint && <p className="text-xs text-muted-foreground mt-1">{m.hint}</p>}
+                    </button>
+                  );
+                })}
+              </div>
+            </li>
+          ),
+        )}
+      </ol>
+
+      <ReviewCard input={input} chosen={chosen} />
+
+      <p className="mt-6 text-center text-xs text-muted-foreground">
+        Tip: log the date afterwards on your{" "}
+        <Link to="/log" className="text-primary hover:underline">
+          ledger
+        </Link>{" "}
+        to sharpen future plans.
+      </p>
+    </section>
+  );
+}
+
+// Post-date review — the outcome loop that turns risk/reward labels into real stats.
+function ReviewCard({
+  input,
+  chosen,
+}: {
+  input: {
+    partnerName: string;
+    city: string;
+    date: string;
+    timeOfDay: TimeOfDay;
+    ageRange: AgeRange;
+  };
+  chosen: Record<number, Move>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [wentWell, setWentWell] = useState(0);
+  const [second, setSecond] = useState<"yes" | "no" | "maybe" | undefined>();
+  const [note, setNote] = useState("");
+  const [sent, setSent] = useState(false);
+
+  async function send() {
+    if (!wentWell) return toast.error("Rate how it went first.");
+    const lastMove = Object.values(chosen).filter(Boolean).slice(-1)[0];
+    const res = await submitReview({
+      input,
+      chosenMove: lastMove,
+      wentWell,
+      gotSecond: second,
+      note,
+    });
+    if (res.ok) {
+      setSent(true);
+      toast.success("Thanks — this makes the next plan smarter 💡");
+    } else toast.error(res.error ?? "Could not save your review.");
+  }
+
+  if (sent) {
+    return (
+      <div className="mt-8 rounded-2xl border border-border bg-card p-5 text-center">
+        <p className="font-semibold">Review saved 🙏</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Your outcome feeds the risk/reward ratings other daters see.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-8 rounded-2xl border border-border bg-card p-5">
+      {!open ? (
+        <button onClick={() => setOpen(true)} className="w-full text-left">
+          <p className="font-bold">Been on the date already? Tell us how it went →</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Your feedback trains the planner — which moves actually work, here, for real.
+          </p>
+        </button>
+      ) : (
+        <div className="space-y-4">
+          <p className="font-bold">How did it go?</p>
+          <div>
+            <label className="text-xs font-semibold block mb-2 text-muted-foreground">
+              Overall
+            </label>
+            <div className="grid grid-cols-5 gap-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setWentWell(n)}
+                  className={`rounded-lg border py-2.5 text-lg transition ${wentWell === n ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
+                >
+                  {["😤", "😕", "😐", "😊", "😍"][n - 1]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold block mb-2 text-muted-foreground">
+              Second date?
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["yes", "maybe", "no"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSecond(second === s ? undefined : s)}
+                  className={`rounded-lg border py-2.5 text-sm font-medium capitalize transition ${second === s ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value.slice(0, 140))}
+            placeholder="What worked or flopped? (optional, anonymous)"
+            className="w-full rounded-xl bg-input border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+          />
+          <button
+            onClick={send}
+            className="w-full rounded-full bg-primary text-primary-foreground py-2.5 font-semibold hover:opacity-90 transition"
+          >
+            Submit review
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -14,6 +14,8 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as PlanAdminRouteImport } from './routes/plan-admin'
+import { Route as PlanRouteImport } from './routes/plan'
 import { Route as LogRouteImport } from './routes/log'
 import { Route as DemoRouteImport } from './routes/demo'
 import { Route as IndexRouteImport } from './routes/index'
@@ -43,6 +45,16 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlanAdminRoute = PlanAdminRouteImport.update({
+  id: '/plan-admin',
+  path: '/plan-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlanRoute = PlanRouteImport.update({
+  id: '/plan',
+  path: '/plan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LogRoute = LogRouteImport.update({
   id: '/log',
   path: '/log',
@@ -63,6 +75,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/demo': typeof DemoRoute
   '/log': typeof LogRoute
+  '/plan': typeof PlanRoute
+  '/plan-admin': typeof PlanAdminRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
@@ -73,6 +87,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/demo': typeof DemoRoute
   '/log': typeof LogRoute
+  '/plan': typeof PlanRoute
+  '/plan-admin': typeof PlanAdminRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
@@ -84,6 +100,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/demo': typeof DemoRoute
   '/log': typeof LogRoute
+  '/plan': typeof PlanRoute
+  '/plan-admin': typeof PlanAdminRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
@@ -96,6 +114,8 @@ export interface FileRouteTypes {
     | '/'
     | '/demo'
     | '/log'
+    | '/plan'
+    | '/plan-admin'
     | '/privacy'
     | '/profile'
     | '/settings'
@@ -106,6 +126,8 @@ export interface FileRouteTypes {
     | '/'
     | '/demo'
     | '/log'
+    | '/plan'
+    | '/plan-admin'
     | '/privacy'
     | '/profile'
     | '/settings'
@@ -116,6 +138,8 @@ export interface FileRouteTypes {
     | '/'
     | '/demo'
     | '/log'
+    | '/plan'
+    | '/plan-admin'
     | '/privacy'
     | '/profile'
     | '/settings'
@@ -127,6 +151,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DemoRoute: typeof DemoRoute
   LogRoute: typeof LogRoute
+  PlanRoute: typeof PlanRoute
+  PlanAdminRoute: typeof PlanAdminRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   SettingsRoute: typeof SettingsRoute
@@ -171,6 +197,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/plan-admin': {
+      id: '/plan-admin'
+      path: '/plan-admin'
+      fullPath: '/plan-admin'
+      preLoaderRoute: typeof PlanAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plan': {
+      id: '/plan'
+      path: '/plan'
+      fullPath: '/plan'
+      preLoaderRoute: typeof PlanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/log': {
       id: '/log'
       path: '/log'
@@ -199,6 +239,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DemoRoute: DemoRoute,
   LogRoute: LogRoute,
+  PlanRoute: PlanRoute,
+  PlanAdminRoute: PlanAdminRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   SettingsRoute: SettingsRoute,
