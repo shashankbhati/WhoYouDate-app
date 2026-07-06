@@ -76,7 +76,7 @@ function durationLabel(h: number): string {
 
 function PlanPage() {
   const { entries } = useStore();
-  const { venues } = useDatePlanStore();
+  useDatePlanStore(); // subscribe so curated venues load in the background
 
   const [name, setName] = useState("");
   const [city, setCity] = useState(DRESDEN.name);
@@ -93,6 +93,7 @@ function PlanPage() {
   const [plan, setPlan] = useState<DatePlan | null>(null);
   const [building, setBuilding] = useState(false);
   const variant = useRef(0);
+  const geoCity = useRef(DRESDEN.name); // the city `coords` currently points at
 
   // City autocomplete (Nominatim — same as the log form)
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
@@ -120,8 +121,10 @@ function PlanPage() {
     }, 400);
   }
   function pickCity(r: NominatimResult) {
-    setCity(cityNameFrom(r));
+    const nm = cityNameFrom(r);
+    setCity(nm);
     setCoords({ lat: parseFloat(r.lat), lon: parseFloat(r.lon) });
+    geoCity.current = nm;
     setSuggestions([]);
     setShowSug(false);
   }
@@ -141,20 +144,41 @@ function PlanPage() {
       durationHours,
     };
     const signal = nameSignal(entries, name);
-    const weather = await getWeather(coords.lat, coords.lon, date, tod).catch(() => null);
+    // If the city was typed but not picked from the dropdown, its coords are
+    // stale — geocode it so the weather matches the actual city.
+    let c = coords;
+    if (city.trim().toLowerCase() !== geoCity.current.trim().toLowerCase()) {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`,
+        );
+        const d = await res.json();
+        if (d[0]) {
+          c = { lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon) };
+          setCoords(c);
+          geoCity.current = city;
+        }
+      } catch {
+        /* keep existing coords */
+      }
+    }
+    const weather = await getWeather(c.lat, c.lon, date, tod).catch(() => null);
+    // Only that city's venues — never fall back to another city's places.
     const cityVenues = venuesForCity(city);
-    setPlan(buildPlan(input, cityVenues.length ? cityVenues : venues, signal, weather, nonce));
+    setPlan(buildPlan(input, cityVenues, signal, weather, nonce));
     setBuilding(false);
   }
 
-  // Real-community proof for this city (kills the "AI-generated" feel).
+  // Real-community proof for the PLANNED city (not the live input, which may have
+  // moved on since the plan was built).
   const cityProof = useMemo(() => {
-    const key = city.trim().toLowerCase();
+    const key = (plan?.city ?? "").trim().toLowerCase();
+    if (!key) return null;
     const rows = entries.filter((e) => e.city.toLowerCase() === key);
     if (rows.length < 8) return null;
     const second = rows.filter((e) => e.secondDate && e.secondDate !== "no").length / rows.length;
     return { count: rows.length, secondPct: Math.round(second * 100) };
-  }, [entries, city]);
+  }, [entries, plan?.city]);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">

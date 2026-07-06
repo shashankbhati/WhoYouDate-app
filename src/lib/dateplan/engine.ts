@@ -182,6 +182,7 @@ export function buildPlan(
   let totalCents = 0;
   let leadAdjusted = false;
   const steps: PlanStep[] = [];
+  const paid: RoadmapStop[] = []; // non-free slot stops that share the budget
   let order = 1;
 
   for (const spec of specs) {
@@ -230,7 +231,7 @@ export function buildPlan(
     const endMin = startMin + spec.minutes;
     clock = endMin + TRANSITION_MIN;
 
-    steps.push({
+    const stop: RoadmapStop = {
       type: "stop",
       order: order++,
       emoji: spec.emoji,
@@ -242,23 +243,26 @@ export function buildPlan(
       venue,
       questions: qs,
       weatherNote,
-    });
+    };
+    steps.push(stop);
+    // A stop is "paid" if it fills a non-free slot — even when we don't yet have
+    // a curated venue to name, so the cost still reflects the budget (an
+    // un-curated city otherwise showed a €0 total).
+    if (spec.slot && !isFreeKind(spec.slot)) paid.push(stop);
   }
 
-  // Split the budget total across the paid stops (walks are free). This makes the
-  // cost scale with duration + budget and always add up — no per-venue inversions.
-  const target = budgetTotalCents(budget, durationHours, currency);
-  const paid = steps.filter(
-    (s): s is RoadmapStop => s.type === "stop" && !!s.venue && !isFreeKind(s.venue.kind),
-  );
+  const totalMin = steps.reduce((a, s) => a + (s.type === "stop" ? s.minutes : 0), 0);
+  const hrs = Math.round((totalMin / 60) * 10) / 10;
+
+  // Split the budget total across the paid stops (walks are free). Anchored to the
+  // ACTUAL planned hours so cost matches the shown duration and always adds up —
+  // no per-venue inversions, and no mismatch when the stop cap trims a long plan.
+  const target = budgetTotalCents(budget, totalMin / 60, currency);
   if (paid.length > 0) {
     const per = Math.max(100, Math.round(target / paid.length / 100) * 100);
     paid.forEach((s) => (s.estCents = per));
     totalCents = per * paid.length;
   }
-
-  const totalMin = steps.reduce((a, s) => a + (s.type === "stop" ? s.minutes : 0), 0);
-  const hrs = Math.round((totalMin / 60) * 10) / 10;
 
   const first = partnerName.trim() || "your date";
   let subline = `A ${hrs}-hour ${timeOfDay} plan in ${city}.`;
