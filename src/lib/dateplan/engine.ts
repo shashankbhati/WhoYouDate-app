@@ -8,13 +8,15 @@ import type {
   NameSignal,
   Level,
 } from "./types";
+import { BUDGET_META } from "./types";
 import { templateFor } from "./templates";
 import { pickQuestion } from "./questions";
 import { MOVES } from "./moves";
+import { estimateStopCents } from "./cost";
 import type { WeatherHint } from "./weather";
 
 // ── The engine ────────────────────────────────────────────────────────────────
-// Pure function: (input, venues, nameSignal, weather, moveStats?) → DatePlan.
+// Pure function: (input, venues, nameSignal, weather) → DatePlan.
 // Same inputs always produce the same plan. No AI, no network, fully testable.
 
 // Small deterministic seed from the inputs so plans are stable per (name, date, tod)
@@ -30,6 +32,22 @@ function seedFrom(s: string): number {
 
 const rewardRank: Record<Level, number> = { low: 1, med: 2, high: 3 };
 
+// When each time of day starts (minutes past midnight) — drives the clock.
+const START_MIN: Record<PlanInput["timeOfDay"], number> = {
+  morning: 10 * 60, // 10:00
+  afternoon: 14 * 60, // 14:00
+  evening: 18 * 60 + 30, // 18:30
+  night: 21 * 60, // 21:00
+};
+const TRANSITION_MIN = 12; // rough gap between stops (getting there, ordering…)
+
+function fmtClock(min: number): string {
+  const m = ((min % 1440) + 1440) % 1440;
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${h.toString().padStart(2, "0")}:${mm.toString().padStart(2, "0")}`;
+}
+
 function bandPriceFit(tier: number | undefined, band: NameSignal["spendBand"] | undefined): number {
   if (tier == null) return 0;
   if (band === "premium") return tier >= 3 ? 2 : 0;
@@ -42,11 +60,17 @@ function pickVenue(
   kind: VenueKind,
   timeOfDay: PlanInput["timeOfDay"],
   band: NameSignal["spendBand"] | undefined,
+  maxTier: number,
   used: Set<string>,
   seed: number,
 ): Venue | undefined {
-  const pool = venues.filter((v) => v.kind === kind);
-  if (pool.length === 0) return undefined;
+  const all = venues.filter((v) => v.kind === kind);
+  if (all.length === 0) return undefined;
+
+  // Budget is an explicit user choice, so it filters hard — but if nothing fits
+  // the budget, fall back to the whole pool rather than dropping the stop.
+  const withinBudget = all.filter((v) => (v.priceTier ?? 2) <= maxTier);
+  const pool = withinBudget.length ? withinBudget : all;
 
   const scored = pool
     .map((v) => ({
@@ -95,16 +119,20 @@ export function buildPlan(
   venues: Venue[],
   signal: NameSignal | undefined,
   weather: WeatherHint | null,
+  nonce = 0, // bump to get a different plan for the SAME inputs ("Try another plan")
 ): DatePlan {
-  const { partnerName, city, date, timeOfDay, ageRange } = input;
-  const seed = seedFrom(`${partnerName}|${date}|${timeOfDay}`);
-  const preferPlayful = ageRange === "18-24";
+  const { partnerName, city, date, timeOfDay, ageRange, budget, currency } = input;
+  const seed = seedFrom(`${partnerName}|${date}|${timeOfDay}|${budget}|${nonce}`);
   const specs = templateFor(city, timeOfDay);
   const band = signal?.spendBand;
+  const maxTier = BUDGET_META[budget].maxTier;
 
-  const used = new Set<string>();
+  const used = new Set<string>(); // venue ids used
+  const usedQ = new Set<string>(); // question texts used (no repeats within a plan)
   let stopSeed = seed;
   let decisionSeed = seed;
+  let clock = START_MIN[timeOfDay];
+  let totalCents = 0;
   const steps: PlanStep[] = [];
   let order = 1;
 
@@ -119,7 +147,7 @@ export function buildPlan(
 
     // stop
     const venue = spec.slot
-      ? pickVenue(venues, spec.slot, timeOfDay, band, used, stopSeed)
+      ? pickVenue(venues, spec.slot, timeOfDay, band, maxTier, used, stopSeed)
       : undefined;
     // If a slot couldn't be filled (owner hasn't curated that kind yet), keep the
     // stop but show a friendly placeholder rather than a broken sentence.
@@ -138,8 +166,15 @@ export function buildPlan(
       weatherNote = `${weather.emoji} ${weather.summary} — perfect for being outside.`;
     }
 
-    const q = pickQuestion(spec.questionStage, stopSeed, preferPlayful);
+    const q = pickQuestion(spec.questionStage, ageRange, usedQ, stopSeed);
     stopSeed++;
+
+    // Clock + cost
+    const startMin = clock;
+    const endMin = startMin + spec.minutes;
+    clock = endMin + TRANSITION_MIN;
+    const estCents = venue ? estimateStopCents(venue.kind, venue.priceTier, currency) : 0;
+    totalCents += estCents;
 
     steps.push({
       type: "stop",
@@ -148,6 +183,8 @@ export function buildPlan(
       title: venue ? `${spec.title} — ${venue.name}` : spec.title,
       scene,
       minutes: spec.minutes,
+      timeLabel: `${fmtClock(startMin)} – ${fmtClock(endMin)}`,
+      estCents,
       venue,
       question: q,
       weatherNote,
@@ -170,6 +207,8 @@ export function buildPlan(
     headline: `Your date with ${first}`,
     subline,
     steps,
+    totalCents,
+    currency,
     nameSignal: signal,
   };
 }

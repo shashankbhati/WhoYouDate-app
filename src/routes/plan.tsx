@@ -1,17 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/datedata/store";
 import { useDatePlanStore, venuesForCity, submitReview } from "@/lib/dateplan/store";
 import { buildPlan } from "@/lib/dateplan/engine";
 import { nameSignal } from "@/lib/dateplan/nameStats";
 import { getWeather } from "@/lib/dateplan/weather";
 import { hasCuratedTemplate } from "@/lib/dateplan/templates";
+import { fmtMoney } from "@/lib/dateplan/cost";
+import { getCountryConfig } from "@/lib/country";
 import {
   TIME_META,
   LEVEL_META,
   REWARD_LABEL,
+  BUDGET_META,
   type TimeOfDay,
   type AgeRange,
+  type Budget,
   type DatePlan,
   type Move,
 } from "@/lib/dateplan/types";
@@ -24,7 +28,7 @@ export const Route = createFileRoute("/plan")({
       {
         name: "description",
         content:
-          "Get a full date roadmap for Dresden — where to go, what to ask, how long to stay, and your next move rated by risk and reward. Built from real dating data, not guesswork.",
+          "Get a full date roadmap for Dresden — where to go, what to ask, how long to stay, what it costs, and your next move rated by risk and reward. Built from real dating data.",
       },
     ],
   }),
@@ -33,6 +37,7 @@ export const Route = createFileRoute("/plan")({
 
 const TODS: TimeOfDay[] = ["morning", "afternoon", "evening", "night"];
 const AGES: AgeRange[] = ["18-24", "25-34", "35-44", "45+"];
+const BUDGETS: Budget[] = ["tight", "comfortable", "treat"];
 
 // Known coords for our launch city so weather works with zero clicks.
 const DRESDEN = { name: "Dresden", lat: 51.0504, lon: 13.7373 };
@@ -77,10 +82,12 @@ function PlanPage() {
   const [date, setDate] = useState(todayISO());
   const [tod, setTod] = useState<TimeOfDay>("evening");
   const [age, setAge] = useState<AgeRange>("25-34");
+  const [budget, setBudget] = useState<Budget>("comfortable");
 
   const [plan, setPlan] = useState<DatePlan | null>(null);
   const [building, setBuilding] = useState(false);
   const [weatherLine, setWeatherLine] = useState<string | null>(null);
+  const variant = useRef(0);
 
   // City autocomplete (Nominatim — same as the log form)
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
@@ -114,17 +121,36 @@ function PlanPage() {
     setShowSug(false);
   }
 
-  async function build() {
+  async function build(nonce = 0) {
+    variant.current = nonce;
     setBuilding(true);
     setWeatherLine(null);
-    const input = { partnerName: name, city, date, timeOfDay: tod, ageRange: age };
+    const currency = getCountryConfig().defaultCurrency;
+    const input = {
+      partnerName: name,
+      city,
+      date,
+      timeOfDay: tod,
+      ageRange: age,
+      budget,
+      currency,
+    };
     const signal = nameSignal(entries, name);
     const weather = await getWeather(coords.lat, coords.lon, date, tod).catch(() => null);
     if (weather) setWeatherLine(`${weather.emoji} ${weather.summary} in ${city}`);
     const cityVenues = venuesForCity(city);
-    setPlan(buildPlan(input, cityVenues.length ? cityVenues : venues, signal, weather));
+    setPlan(buildPlan(input, cityVenues.length ? cityVenues : venues, signal, weather, nonce));
     setBuilding(false);
   }
+
+  // Real-community proof for this city (kills the "AI-generated" feel).
+  const cityProof = useMemo(() => {
+    const key = city.trim().toLowerCase();
+    const rows = entries.filter((e) => e.city.toLowerCase() === key);
+    if (rows.length < 8) return null;
+    const second = rows.filter((e) => e.secondDate && e.secondDate !== "no").length / rows.length;
+    return { count: rows.length, secondPct: Math.round(second * 100) };
+  }, [entries, city]);
 
   // Auto-build a default Dresden plan on first load so the page is never blank
   // (same "never show an empty page" principle as the ledger).
@@ -138,20 +164,16 @@ function PlanPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold">Plan the date 🗺️</h1>
-          <p className="text-muted-foreground mt-1">
-            A full roadmap — where to go, what to ask, and your next move rated by risk & reward.
-          </p>
-        </div>
-      </div>
+      <h1 className="text-3xl font-bold">Plan the date</h1>
+      <p className="text-muted-foreground mt-1">
+        A full roadmap — where to go, what to ask, what it costs, and your next move rated by risk.
+      </p>
 
       {/* ── Inputs ── */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          build();
+          build(0);
         }}
         className="mt-6 rounded-2xl border border-border bg-card p-5 space-y-5"
       >
@@ -199,6 +221,40 @@ function PlanPage() {
           </div>
         </div>
 
+        <div>
+          <label className="text-sm font-semibold block mb-2">Time of day</label>
+          <div className="grid grid-cols-4 gap-2">
+            {TODS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTod(t)}
+                className={`rounded-xl border py-3 flex flex-col items-center gap-1 transition ${tod === t ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
+              >
+                <span className="text-xl">{TIME_META[t].emoji}</span>
+                <span className="text-xs font-medium">{TIME_META[t].label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold block mb-2">Budget</label>
+          <div className="grid grid-cols-3 gap-2">
+            {BUDGETS.map((b) => (
+              <button
+                key={b}
+                type="button"
+                onClick={() => setBudget(b)}
+                className={`rounded-xl border py-3 flex flex-col items-center gap-1 transition ${budget === b ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
+              >
+                <span className="text-xl">{BUDGET_META[b].emoji}</span>
+                <span className="text-xs font-medium">{BUDGET_META[b].label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-semibold block mb-2">Date</label>
@@ -226,29 +282,12 @@ function PlanPage() {
           </div>
         </div>
 
-        <div>
-          <label className="text-sm font-semibold block mb-2">Time of day</label>
-          <div className="grid grid-cols-4 gap-2">
-            {TODS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTod(t)}
-                className={`rounded-xl border py-3 flex flex-col items-center gap-1 transition ${tod === t ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
-              >
-                <span className="text-xl">{TIME_META[t].emoji}</span>
-                <span className="text-xs font-medium">{TIME_META[t].label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
         <button
           type="submit"
           disabled={building}
           className="w-full rounded-full bg-primary text-primary-foreground py-3 font-semibold hover:opacity-90 transition disabled:opacity-60"
         >
-          {building ? "Building your plan…" : plan ? "Rebuild plan 🔄" : "Build my date plan ✨"}
+          {building ? "Building your plan…" : plan ? "Update plan" : "Build my date plan"}
         </button>
       </form>
 
@@ -265,6 +304,9 @@ function PlanPage() {
       {plan && (
         <PlanView
           plan={plan}
+          proof={cityProof}
+          onAnother={() => build(variant.current + 1)}
+          building={building}
           input={{ partnerName: name, city, date, timeOfDay: tod, ageRange: age }}
         />
       )}
@@ -274,9 +316,15 @@ function PlanPage() {
 
 function PlanView({
   plan,
+  proof,
+  onAnother,
+  building,
   input,
 }: {
   plan: DatePlan;
+  proof: { count: number; secondPct: number } | null;
+  onAnother: () => void;
+  building: boolean;
   input: {
     partnerName: string;
     city: string;
@@ -285,109 +333,144 @@ function PlanView({
     ageRange: AgeRange;
   };
 }) {
-  // Track which move the user picked at each decision point (feeds the review loop).
   const [chosen, setChosen] = useState<Record<number, Move>>({});
+  const totalMin = plan.steps.reduce((a, s) => a + (s.type === "stop" ? s.minutes : 0), 0);
+  const hrs = Math.round((totalMin / 60) * 10) / 10;
 
   return (
     <section className="mt-8">
-      <div className="text-center">
+      {/* Result header — the "this is a real thing, not a chatbot reply" block */}
+      <div className="rounded-2xl border border-border bg-gradient-to-b from-primary/[0.06] to-transparent p-5">
         <h2 className="text-2xl font-bold">{plan.headline}</h2>
-        <p className="text-muted-foreground mt-1 text-sm max-w-xl mx-auto">{plan.subline}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Stat label="Duration" value={`~${hrs} hrs`} />
+          <Stat label="Est. cost" value={`~${fmtMoney(plan.totalCents, plan.currency)}`} />
+          {proof && <Stat label="2nd-date rate here" value={`${proof.secondPct}%`} />}
+        </div>
+        {proof ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            📊 Built from{" "}
+            <span className="text-foreground font-semibold">{proof.count} real dates</span> logged
+            in {plan.city}, weighted to your budget and age.
+          </p>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">{plan.subline}</p>
+        )}
       </div>
 
-      <ol className="mt-6 space-y-4">
+      {/* The timeline */}
+      <ol className="relative mt-6 ml-3 border-l border-border/70 pl-6 space-y-6">
         {plan.steps.map((step) =>
           step.type === "stop" ? (
-            <li key={step.order} className="rounded-2xl border border-border bg-card p-5">
-              <div className="flex items-start gap-3">
-                <span className="text-2xl leading-none shrink-0">{step.emoji}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-bold">{step.title}</h3>
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      ~{step.minutes} min
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">{step.scene}</p>
-
-                  {step.venue && (
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                      {step.venue.rating != null && (
-                        <span className="text-amber-500 font-semibold">
-                          ★ {step.venue.rating.toFixed(1)}
-                        </span>
-                      )}
-                      {step.venue.priceTier != null && (
-                        <span className="text-muted-foreground">
-                          {"€".repeat(step.venue.priceTier)}
-                        </span>
-                      )}
-                      {step.venue.area && (
-                        <span className="text-muted-foreground">📍 {step.venue.area}</span>
-                      )}
-                      {step.venue.seed && (
-                        <span className="text-muted-foreground/70 italic">starter pick</span>
-                      )}
-                    </div>
-                  )}
-                  {step.venue?.note && (
-                    <p className="text-xs text-muted-foreground mt-1">💡 {step.venue.note}</p>
-                  )}
-
-                  {step.weatherNote && (
-                    <p className="mt-2 text-xs rounded-lg bg-muted px-3 py-2">{step.weatherNote}</p>
-                  )}
-
-                  {step.question && (
-                    <div className="mt-3 rounded-xl bg-primary/5 border border-primary/15 px-3 py-2.5">
-                      <p className="text-[11px] uppercase tracking-wider font-bold text-primary/80">
-                        Ask here
-                      </p>
-                      <p className="text-sm mt-0.5">“{step.question.text}”</p>
-                    </div>
-                  )}
+            <li key={step.order} className="relative">
+              <span className="absolute -left-[31px] top-1.5 h-3.5 w-3.5 rounded-full bg-primary ring-4 ring-background" />
+              {step.timeLabel && (
+                <div className="text-xs font-mono text-muted-foreground mb-1">{step.timeLabel}</div>
+              )}
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-bold">
+                    <span className="mr-1.5">{step.emoji}</span>
+                    {step.title}
+                  </h3>
+                  <span className="text-xs text-muted-foreground shrink-0 text-right">
+                    {step.minutes} min
+                    {step.estCents != null && (
+                      <div className="text-foreground font-semibold">
+                        {step.estCents === 0
+                          ? "free"
+                          : `~${fmtMoney(step.estCents, plan.currency)}`}
+                      </div>
+                    )}
+                  </span>
                 </div>
+                <p className="text-sm text-muted-foreground mt-1">{step.scene}</p>
+
+                {step.venue && (
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    {step.venue.rating != null && (
+                      <span className="text-amber-500 font-semibold">
+                        ★ {step.venue.rating.toFixed(1)}
+                      </span>
+                    )}
+                    {step.venue.priceTier != null && (
+                      <span className="text-muted-foreground">
+                        {"€".repeat(step.venue.priceTier)}
+                      </span>
+                    )}
+                    {step.venue.area && (
+                      <span className="text-muted-foreground">📍 {step.venue.area}</span>
+                    )}
+                    {step.venue.seed && (
+                      <span className="text-muted-foreground/70 italic">starter pick</span>
+                    )}
+                  </div>
+                )}
+                {step.venue?.note && (
+                  <p className="text-xs text-muted-foreground mt-1">💡 {step.venue.note}</p>
+                )}
+
+                {step.weatherNote && (
+                  <p className="mt-2 text-xs rounded-lg bg-muted px-3 py-2">{step.weatherNote}</p>
+                )}
+
+                {step.question && (
+                  <div className="mt-3 rounded-xl bg-primary/5 border border-primary/15 px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-wider font-bold text-primary/80">
+                      Ask here
+                    </p>
+                    <p className="text-sm mt-0.5">“{step.question.text}”</p>
+                  </div>
+                )}
               </div>
             </li>
           ) : (
-            <li
-              key={step.order}
-              className="rounded-2xl border border-dashed border-primary/40 bg-primary/[0.03] p-5"
-            >
-              <p className="font-bold text-sm">🎯 {step.prompt}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Pick the one that fits the vibe — each is rated by risk and payoff.
-              </p>
-              <div className="mt-3 grid gap-2.5">
-                {step.options.map((m) => {
-                  const isPicked = chosen[step.order]?.id === m.id;
-                  const lm = LEVEL_META[m.risk];
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() =>
-                        setChosen((c) => ({ ...c, [step.order]: isPicked ? undefined! : m }))
-                      }
-                      className={`text-left rounded-xl border p-3.5 transition ${isPicked ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{lm.dot}</span>
-                        <span className={`text-xs font-bold ${lm.color}`}>{lm.label}</span>
-                        <span className="text-xs text-muted-foreground">
-                          · {REWARD_LABEL[m.reward]}
-                        </span>
-                      </div>
-                      <p className="text-sm font-medium mt-1.5">{m.label}</p>
-                      {m.hint && <p className="text-xs text-muted-foreground mt-1">{m.hint}</p>}
-                    </button>
-                  );
-                })}
+            <li key={step.order} className="relative">
+              <span className="absolute -left-[33px] top-1.5 h-4 w-4 rounded-full border-2 border-dashed border-primary bg-background" />
+              <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/[0.03] p-4">
+                <p className="font-bold text-sm">🎯 {step.prompt}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Pick the one that fits the vibe — each is rated by risk and payoff.
+                </p>
+                <div className="mt-3 grid gap-2.5">
+                  {step.options.map((m) => {
+                    const isPicked = chosen[step.order]?.id === m.id;
+                    const lm = LEVEL_META[m.risk];
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() =>
+                          setChosen((c) => ({ ...c, [step.order]: isPicked ? undefined! : m }))
+                        }
+                        className={`text-left rounded-xl border p-3.5 transition ${isPicked ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{lm.dot}</span>
+                          <span className={`text-xs font-bold ${lm.color}`}>{lm.label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            · {REWARD_LABEL[m.reward]}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium mt-1.5">{m.label}</p>
+                        {m.hint && <p className="text-xs text-muted-foreground mt-1">{m.hint}</p>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </li>
           ),
         )}
       </ol>
+
+      <button
+        onClick={onAnother}
+        disabled={building}
+        className="mt-6 w-full rounded-full border border-primary text-primary py-2.5 font-semibold hover:bg-primary/10 transition disabled:opacity-60"
+      >
+        {building ? "Shuffling…" : "🔄 Try another plan"}
+      </button>
 
       <ReviewCard input={input} chosen={chosen} />
 
@@ -399,6 +482,15 @@ function PlanView({
         to sharpen future plans.
       </p>
     </section>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-card border border-border px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-base font-bold">{value}</div>
+    </div>
   );
 }
 

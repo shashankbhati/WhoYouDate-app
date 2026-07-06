@@ -2,7 +2,16 @@ import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { ensureAuth } from "../datedata/store";
 import { seedDresdenVenues } from "./templates";
-import type { Venue, VenueKind, TimeOfDay, PlanInput, Move } from "./types";
+import type { Venue, VenueKind, TimeOfDay, AgeRange, Move } from "./types";
+
+// Just the plan fields a review needs — decoupled from PlanInput (which also
+// carries budget/currency the review doesn't record).
+export interface ReviewContext {
+  partnerName: string;
+  city: string;
+  timeOfDay: TimeOfDay;
+  ageRange: AgeRange;
+}
 
 // ── Venue store (module singleton, same pattern as the ledger store) ──────────
 let _venues: Venue[] = seedDresdenVenues(); // instant, never blank
@@ -149,7 +158,7 @@ export async function deleteVenue(id: string): Promise<void> {
 
 // ── Post-date review (the outcome loop) ───────────────────────────────────────
 export interface ReviewDraft {
-  input: PlanInput;
+  input: ReviewContext;
   chosenMove?: Move;
   wentWell: number; // 1–5
   gotSecond?: "yes" | "no" | "maybe";
