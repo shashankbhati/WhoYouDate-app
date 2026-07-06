@@ -49,11 +49,14 @@ async function load() {
   try {
     const { data, error } = await supabase.from("venues").select("*").limit(2000);
     if (!error && data) {
-      // Real curated rows replace the starter seed for any city they cover;
-      // keep seed rows only for cities/kinds with no curated data yet.
+      // Curated rows replace starters only for the exact city+KIND they cover.
+      // A category the owner hasn't curated yet keeps its starter so the plan
+      // still shows a named venue instead of "a great local bar".
       const curated = data.map(rowToVenue);
-      const curatedCities = new Set(curated.map((v) => v.city.toLowerCase()));
-      const seedKept = seedDresdenVenues().filter((v) => !curatedCities.has(v.city.toLowerCase()));
+      const covered = new Set(curated.map((v) => `${v.city.toLowerCase()}|${v.kind}`));
+      const seedKept = seedDresdenVenues().filter(
+        (v) => !covered.has(`${v.city.toLowerCase()}|${v.kind}`),
+      );
       _venues = [...curated, ...seedKept];
       _loaded = true;
       emit();
@@ -139,11 +142,12 @@ export async function addVenue(d: VenueDraft): Promise<{ ok: boolean; error?: st
         : error.message;
     return { ok: false, error: msg };
   }
-  // drop any seed for this city, prepend the real row
-  const city = d.city.trim().toLowerCase();
+  // Drop only the starter of the SAME city+kind (keep starters for other
+  // categories so their stops still get a named venue), then prepend the real row.
+  const cityKind = `${d.city.trim().toLowerCase()}|${d.kind}`;
   _venues = [
     rowToVenue(data),
-    ..._venues.filter((v) => !(v.seed && v.city.toLowerCase() === city)),
+    ..._venues.filter((v) => !(v.seed && `${v.city.toLowerCase()}|${v.kind}` === cityKind)),
   ];
   emit();
   return { ok: true };
