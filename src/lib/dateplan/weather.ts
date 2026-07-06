@@ -3,10 +3,14 @@ import type { TimeOfDay } from "./types";
 // ── Weather (Open-Meteo — free, no API key) ──────────────────────────────────
 // Used to decide whether outdoor roadmap stops stay outdoors or swap indoors.
 
+export type WeatherMood = "nice" | "hot" | "cold" | "wet";
+
 export interface WeatherHint {
   outdoorOk: boolean;
   summary: string; // short human line, e.g. "12°C, light rain expected"
   emoji: string;
+  temp: number; // °C at the target hour
+  mood: WeatherMood; // drives how the plan is worded/ordered
 }
 
 const HOUR_BY_TOD: Record<TimeOfDay, number> = {
@@ -55,10 +59,12 @@ export async function getWeather(
 
     const temp = Math.round(temps[idx]);
     const { bad, label, emoji } = describeCode(codes[idx] ?? 0);
-    const cold = temp <= 4;
-    const outdoorOk = !bad && !cold;
-    const summary = `${temp}°C, ${label}${cold ? " (chilly)" : ""}`;
-    return { outdoorOk, summary, emoji };
+    const cold = temp <= 6;
+    const hot = temp >= 26;
+    const outdoorOk = !bad && temp > 4;
+    const summary = `${temp}°C, ${label}`;
+    const mood: WeatherMood = bad ? "wet" : hot ? "hot" : cold ? "cold" : "nice";
+    return { outdoorOk, summary, emoji, temp, mood };
   } catch {
     return null;
   }

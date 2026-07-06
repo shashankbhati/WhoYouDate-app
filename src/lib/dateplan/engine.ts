@@ -9,18 +9,20 @@ import type {
   Level,
 } from "./types";
 import { BUDGET_META } from "./types";
-import { templateFor } from "./templates";
+import { templateFor, FILLERS } from "./templates";
+import type { StepSpec, StopSpec } from "./templates";
 import { pickQuestion } from "./questions";
 import { MOVES } from "./moves";
 import { estimateStopCents } from "./cost";
 import type { WeatherHint } from "./weather";
 
+// Re-export the spec types the templates module owns so callers have one import.
+export type { StepSpec, StopSpec } from "./templates";
+
 // ── The engine ────────────────────────────────────────────────────────────────
 // Pure function: (input, venues, nameSignal, weather) → DatePlan.
 // Same inputs always produce the same plan. No AI, no network, fully testable.
 
-// Small deterministic seed from the inputs so plans are stable per (name, date, tod)
-// but vary between different dates — no randomness.
 function seedFrom(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
@@ -32,12 +34,11 @@ function seedFrom(s: string): number {
 
 const rewardRank: Record<Level, number> = { low: 1, med: 2, high: 3 };
 
-// When each time of day starts (minutes past midnight) — drives the clock.
 const START_MIN: Record<PlanInput["timeOfDay"], number> = {
-  morning: 10 * 60, // 10:00
-  afternoon: 14 * 60, // 14:00
-  evening: 18 * 60 + 30, // 18:30
-  night: 21 * 60, // 21:00
+  morning: 10 * 60,
+  afternoon: 14 * 60,
+  evening: 18 * 60 + 30,
+  night: 21 * 60,
 };
 const TRANSITION_MIN = 12; // rough gap between stops (getting there, ordering…)
 
@@ -49,10 +50,10 @@ function fmtClock(min: number): string {
 }
 
 function bandPriceFit(tier: number | undefined, band: NameSignal["spendBand"] | undefined): number {
-  if (tier == null) return 0;
-  if (band === "premium") return tier >= 3 ? 2 : 0;
-  if (band === "budget") return tier <= 2 ? 2 : 0;
-  return tier === 2 || tier === 3 ? 1 : 0; // mid / unknown
+  if (tier == null || !band) return 0;
+  if (band === "premium") return tier >= 3 ? 1 : 0;
+  if (band === "budget") return tier <= 2 ? 1 : 0;
+  return tier === 2 || tier === 3 ? 0.5 : 0;
 }
 
 function pickVenue(
@@ -60,6 +61,7 @@ function pickVenue(
   kind: VenueKind,
   timeOfDay: PlanInput["timeOfDay"],
   band: NameSignal["spendBand"] | undefined,
+  aim: number, // budget's target price tier
   maxTier: number,
   used: Set<string>,
   seed: number,
@@ -67,8 +69,7 @@ function pickVenue(
   const all = venues.filter((v) => v.kind === kind);
   if (all.length === 0) return undefined;
 
-  // Budget is an explicit user choice, so it filters hard — but if nothing fits
-  // the budget, fall back to the whole pool rather than dropping the stop.
+  // Budget filters hard, but if nothing fits, fall back rather than drop the stop.
   const withinBudget = all.filter((v) => (v.priceTier ?? 2) <= maxTier);
   const pool = withinBudget.length ? withinBudget : all;
 
@@ -77,16 +78,18 @@ function pickVenue(
       v,
       score:
         (v.goodFor.includes(timeOfDay) ? 2 : 0) +
-        bandPriceFit(v.priceTier, band) +
+        // gravitate to the budget's target tier — this is what makes the budget
+        // control actually change which venue (and cost) you get.
+        (2 - Math.abs((v.priceTier ?? 2) - aim)) +
+        bandPriceFit(v.priceTier, band) * 0.3 +
         (v.rating ?? 0) / 5 +
-        (used.has(v.id) ? -3 : 0), // avoid repeats, but allow if it's the only option
+        (used.has(v.id) ? -3 : 0),
     }))
     .sort(
       (a, b) =>
         b.score - a.score || (b.v.rating ?? 0) - (a.v.rating ?? 0) || a.v.id.localeCompare(b.v.id),
     );
 
-  // Rotate among the top choices by seed so different dates don't always get #1.
   const topBand = scored.filter((s) => s.score >= scored[0].score - 0.4);
   const chosen = topBand[seed % topBand.length].v;
   used.add(chosen.id);
@@ -114,6 +117,46 @@ function pickMoves(
   return out;
 }
 
+// Trim or extend the template so the plan roughly fits the target duration.
+// Short target → fewer stops; long target (whole day) → cycle in filler stops.
+function fitToDuration(base: StepSpec[], targetMin: number): StepSpec[] {
+  const chosen: StepSpec[] = [];
+  let mins = 0;
+  let stops = 0;
+  for (const s of base) {
+    if (mins >= targetMin && stops >= 2) break;
+    chosen.push(s);
+    if (s.kind === "stop") {
+      mins += s.minutes;
+      stops++;
+    }
+  }
+  let fi = 0;
+  while (mins < targetMin - 15 && stops < 9) {
+    const f: StopSpec = FILLERS[fi % FILLERS.length];
+    chosen.push(f);
+    mins += f.minutes;
+    stops++;
+    if (fi % 2 === 1) chosen.push({ kind: "decision", stage: "late" });
+    fi++;
+  }
+  if (!chosen.some((s) => s.kind === "decision")) chosen.push({ kind: "decision", stage: "late" });
+  return chosen;
+}
+
+function weatherBannerFor(w: WeatherHint, timeOfDay: PlanInput["timeOfDay"]): string {
+  switch (w.mood) {
+    case "hot":
+      return `${w.emoji} ${w.summary} — beat the heat: this plan leads with something cold and keeps the walking for the cooler part of the ${timeOfDay}.`;
+    case "cold":
+      return `${w.emoji} ${w.summary} — chilly out, so this plan leans on warm, indoor stops between the highlights.`;
+    case "wet":
+      return `${w.emoji} ${w.summary} — rain about, so the outdoor legs are swapped for indoor backups.`;
+    default:
+      return `${w.emoji} ${w.summary} — a lovely ${timeOfDay} to be outside; the plan makes the most of the walk.`;
+  }
+}
+
 export function buildPlan(
   input: PlanInput,
   venues: Venue[],
@@ -121,18 +164,21 @@ export function buildPlan(
   weather: WeatherHint | null,
   nonce = 0, // bump to get a different plan for the SAME inputs ("Try another plan")
 ): DatePlan {
-  const { partnerName, city, date, timeOfDay, ageRange, budget, currency } = input;
-  const seed = seedFrom(`${partnerName}|${date}|${timeOfDay}|${budget}|${nonce}`);
-  const specs = templateFor(city, timeOfDay);
+  const { partnerName, city, date, timeOfDay, ageRange, budget, currency, durationHours } = input;
+  const seed = seedFrom(`${partnerName}|${date}|${timeOfDay}|${budget}|${durationHours}|${nonce}`);
   const band = signal?.spendBand;
-  const maxTier = BUDGET_META[budget].maxTier;
+  const { aim, maxTier } = BUDGET_META[budget];
 
-  const used = new Set<string>(); // venue ids used
-  const usedQ = new Set<string>(); // question texts used (no repeats within a plan)
+  const targetMin = Math.max(60, Math.round(durationHours * 60));
+  const specs = fitToDuration(templateFor(city, timeOfDay), targetMin);
+
+  const used = new Set<string>();
+  const usedQ = new Set<string>();
   let stopSeed = seed;
   let decisionSeed = seed;
   let clock = START_MIN[timeOfDay];
   let totalCents = 0;
+  let leadAdjusted = false;
   const steps: PlanStep[] = [];
   let order = 1;
 
@@ -145,17 +191,26 @@ export function buildPlan(
       continue;
     }
 
-    // stop
     const venue = spec.slot
-      ? pickVenue(venues, spec.slot, timeOfDay, band, maxTier, used, stopSeed)
+      ? pickVenue(venues, spec.slot, timeOfDay, band, aim, maxTier, used, stopSeed)
       : undefined;
-    // If a slot couldn't be filled (owner hasn't curated that kind yet), keep the
-    // stop but show a friendly placeholder rather than a broken sentence.
     let scene = spec.scene;
     if (spec.slot) {
       scene = venue
         ? scene.replace("{venue}", venue.name)
         : scene.replace("{venue}", `a great local ${spec.slot}`);
+    }
+
+    // Temperature-driven wording on the first drink/coffee stop — makes the
+    // weather visibly shape the plan, not just add a footnote.
+    if (!leadAdjusted && venue && (venue.kind === "cafe" || venue.kind === "bar") && weather) {
+      if (weather.mood === "hot") {
+        scene = `It's warm out — start cool. ${scene}`;
+        leadAdjusted = true;
+      } else if (weather.mood === "cold") {
+        scene = `Somewhere warm to start — ${scene.charAt(0).toLowerCase()}${scene.slice(1)}`;
+        leadAdjusted = true;
+      }
     }
 
     let weatherNote: string | undefined;
@@ -169,7 +224,6 @@ export function buildPlan(
     const q = pickQuestion(spec.questionStage, ageRange, usedQ, stopSeed);
     stopSeed++;
 
-    // Clock + cost
     const startMin = clock;
     const endMin = startMin + spec.minutes;
     clock = endMin + TRANSITION_MIN;
@@ -209,6 +263,7 @@ export function buildPlan(
     steps,
     totalCents,
     currency,
+    weatherBanner: weather ? weatherBannerFor(weather, timeOfDay) : undefined,
     nameSignal: signal,
   };
 }

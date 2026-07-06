@@ -309,6 +309,57 @@ export function hasCuratedTemplate(city: string): boolean {
   return city.trim().toLowerCase() in CITY_TEMPLATES;
 }
 
+// Extra stops the engine appends (cycling) to stretch a plan toward a longer
+// target duration — e.g. a whole-day date. Kept generic so they work anywhere.
+export const FILLERS: StopSpec[] = [
+  {
+    kind: "stop",
+    emoji: "☕",
+    minutes: 30,
+    slot: "cafe",
+    title: "Coffee refuel",
+    scene: "Refuel with a coffee at {venue} and let the conversation breathe.",
+    questionStage: "mid",
+  },
+  {
+    kind: "stop",
+    emoji: "🚶",
+    minutes: 25,
+    title: "Wander a bit more",
+    scene: "Take a slow wander with no particular destination.",
+    questionStage: "mid",
+    outdoor: true,
+    indoorSwap: "Duck somewhere cosy and keep talking.",
+  },
+  {
+    kind: "stop",
+    emoji: "🎲",
+    minutes: 45,
+    slot: "activity",
+    title: "Do something together",
+    scene: "Break things up with something hands-on at {venue}.",
+    questionStage: "mid",
+  },
+  {
+    kind: "stop",
+    emoji: "🍨",
+    minutes: 20,
+    slot: "dessert",
+    title: "Something sweet",
+    scene: "Grab something sweet at {venue}.",
+    questionStage: "late",
+  },
+  {
+    kind: "stop",
+    emoji: "🍹",
+    minutes: 40,
+    slot: "bar",
+    title: "One more drink",
+    scene: "Keep the evening going with a drink at {venue}.",
+    questionStage: "late",
+  },
+];
+
 // ── Starter venues ────────────────────────────────────────────────────────────
 // Shown instantly so the planner is never blank (same philosophy as the app's
 // seeded ledger). These are STARTER EXAMPLES — the owner replaces/verifies them
@@ -397,6 +448,58 @@ export function seedDresdenVenues(): Venue[] {
       ["evening", "night"],
       ["playful", "games"],
       "Pool tables — the classic ice-breaker move.",
+    ),
+    // ── Comfortable (tier 3) ──
+    v(
+      "Kaffeehaus Aha",
+      "cafe",
+      3,
+      4.5,
+      "Altstadt",
+      ["morning", "afternoon"],
+      ["charming", "fair-trade"],
+      "A nicer, slower brunch spot near the Frauenkirche.",
+    ),
+    v(
+      "Wenzel Prager Bierstuben",
+      "restaurant",
+      3,
+      4.4,
+      "Altstadt",
+      ["evening", "night"],
+      ["hearty", "characterful"],
+      "Proper sit-down dinner with atmosphere.",
+    ),
+    v(
+      "Ch800 Cocktailbar",
+      "bar",
+      3,
+      4.5,
+      "Neustadt",
+      ["evening", "night"],
+      ["romantic", "cocktails"],
+      "Grown-up cocktail bar — good for a real conversation.",
+    ),
+    // ── Treat (tier 4) ──
+    v(
+      "Kastenmeiers",
+      "restaurant",
+      4,
+      4.6,
+      "Altstadt",
+      ["evening", "night"],
+      ["upscale", "riverside"],
+      "Fish-forward fine dining on the Terrassenufer — the treat option.",
+    ),
+    v(
+      "Bean & Beluga",
+      "restaurant",
+      4,
+      4.7,
+      "Blasewitz",
+      ["evening", "night"],
+      ["fine-dining", "special"],
+      "Special-occasion tasting menus when you're going all out.",
     ),
   ];
 }

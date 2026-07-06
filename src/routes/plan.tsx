@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/datedata/store";
 import { useDatePlanStore, venuesForCity, submitReview } from "@/lib/dateplan/store";
 import { buildPlan } from "@/lib/dateplan/engine";
@@ -68,6 +68,11 @@ function cityNameFrom(r: NominatimResult): string {
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
+function durationLabel(h: number): string {
+  if (h >= 8) return "Whole day";
+  if (h >= 5) return "Half day";
+  return `${h} hr${h > 1 ? "s" : ""}`;
+}
 
 function PlanPage() {
   const { entries } = useStore();
@@ -83,10 +88,10 @@ function PlanPage() {
   const [tod, setTod] = useState<TimeOfDay>("evening");
   const [age, setAge] = useState<AgeRange>("25-34");
   const [budget, setBudget] = useState<Budget>("comfortable");
+  const [durationHours, setDurationHours] = useState(3);
 
   const [plan, setPlan] = useState<DatePlan | null>(null);
   const [building, setBuilding] = useState(false);
-  const [weatherLine, setWeatherLine] = useState<string | null>(null);
   const variant = useRef(0);
 
   // City autocomplete (Nominatim — same as the log form)
@@ -124,7 +129,6 @@ function PlanPage() {
   async function build(nonce = 0) {
     variant.current = nonce;
     setBuilding(true);
-    setWeatherLine(null);
     const currency = getCountryConfig().defaultCurrency;
     const input = {
       partnerName: name,
@@ -134,10 +138,10 @@ function PlanPage() {
       ageRange: age,
       budget,
       currency,
+      durationHours,
     };
     const signal = nameSignal(entries, name);
     const weather = await getWeather(coords.lat, coords.lon, date, tod).catch(() => null);
-    if (weather) setWeatherLine(`${weather.emoji} ${weather.summary} in ${city}`);
     const cityVenues = venuesForCity(city);
     setPlan(buildPlan(input, cityVenues.length ? cityVenues : venues, signal, weather, nonce));
     setBuilding(false);
@@ -151,16 +155,6 @@ function PlanPage() {
     const second = rows.filter((e) => e.secondDate && e.secondDate !== "no").length / rows.length;
     return { count: rows.length, secondPct: Math.round(second * 100) };
   }, [entries, city]);
-
-  // Auto-build a default Dresden plan on first load so the page is never blank
-  // (same "never show an empty page" principle as the ledger).
-  const didInit = useRef(false);
-  useEffect(() => {
-    if (didInit.current) return;
-    didInit.current = true;
-    build();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
@@ -255,6 +249,27 @@ function PlanPage() {
           </div>
         </div>
 
+        <div>
+          <label className="text-sm font-semibold flex items-center justify-between mb-2">
+            <span>How long?</span>
+            <span className="text-primary font-bold">{durationLabel(durationHours)}</span>
+          </label>
+          <input
+            type="range"
+            min={1}
+            max={8}
+            step={1}
+            value={durationHours}
+            onChange={(e) => setDurationHours(+e.target.value)}
+            className="w-full accent-[var(--primary)]"
+          />
+          <div className="flex justify-between text-[11px] text-muted-foreground mt-1">
+            <span>Quick (1h)</span>
+            <span>Half day</span>
+            <span>Whole day</span>
+          </div>
+        </div>
+
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-semibold block mb-2">Date</label>
@@ -287,7 +302,7 @@ function PlanPage() {
           disabled={building}
           className="w-full rounded-full bg-primary text-primary-foreground py-3 font-semibold hover:opacity-90 transition disabled:opacity-60"
         >
-          {building ? "Building your plan…" : plan ? "Update plan" : "Build my date plan"}
+          {building ? "Planning…" : "Plan a date 🗺️"}
         </button>
       </form>
 
@@ -296,8 +311,18 @@ function PlanPage() {
           Dresden is fully curated. Other cities use a general roadmap for now — more cities coming.
         </p>
       )}
-      {weatherLine && (
-        <p className="mt-3 text-sm text-center text-muted-foreground">{weatherLine}</p>
+
+      {/* Empty state before the first plan — keeps the page from feeling blank. */}
+      {!plan && !building && (
+        <div className="mt-8 rounded-2xl border border-dashed border-border bg-card/50 p-8 text-center">
+          <p className="text-4xl">🗺️</p>
+          <p className="mt-3 font-semibold">Your date roadmap appears here</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+            Set the vibe above and tap{" "}
+            <span className="text-foreground font-medium">Plan a date</span> — you'll get where to
+            go, what to ask, what it costs, and your best moves.
+          </p>
+        </div>
       )}
 
       {/* ── The plan ── */}
@@ -342,6 +367,9 @@ function PlanView({
       {/* Result header — the "this is a real thing, not a chatbot reply" block */}
       <div className="rounded-2xl border border-border bg-gradient-to-b from-primary/[0.06] to-transparent p-5">
         <h2 className="text-2xl font-bold">{plan.headline}</h2>
+        {plan.weatherBanner && (
+          <p className="mt-2 text-sm rounded-xl bg-muted px-3 py-2">{plan.weatherBanner}</p>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <Stat label="Duration" value={`~${hrs} hrs`} />
           <Stat label="Est. cost" value={`~${fmtMoney(plan.totalCents, plan.currency)}`} />

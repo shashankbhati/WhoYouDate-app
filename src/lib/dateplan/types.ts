@@ -101,6 +101,7 @@ export interface DatePlan {
   steps: PlanStep[];
   totalCents: number; // sum of per-stop estimates
   currency: string;
+  weatherBanner?: string; // prominent, plan-shaping weather line
   nameSignal?: NameSignal; // present when we have data on this first name
 }
 
@@ -112,6 +113,7 @@ export interface PlanInput {
   ageRange: AgeRange;
   budget: Budget;
   currency: string;
+  durationHours: number; // 1 → whole day (~8); shapes how many stops fit
 }
 
 export const TIME_META: Record<TimeOfDay, { label: string; emoji: string }> = {
@@ -133,8 +135,12 @@ export const REWARD_LABEL: Record<Level, string> = {
   high: "big payoff",
 };
 
-export const BUDGET_META: Record<Budget, { label: string; emoji: string; maxTier: number }> = {
-  tight: { label: "Keep it cheap", emoji: "🪙", maxTier: 2 },
-  comfortable: { label: "Comfortable", emoji: "💶", maxTier: 3 },
-  treat: { label: "Treat them", emoji: "✨", maxTier: 4 },
+// maxTier = hard ceiling on venue price; aim = the tier the picker gravitates to.
+export const BUDGET_META: Record<
+  Budget,
+  { label: string; emoji: string; maxTier: number; aim: number }
+> = {
+  tight: { label: "Keep it cheap", emoji: "🪙", maxTier: 2, aim: 1 },
+  comfortable: { label: "Comfortable", emoji: "💶", maxTier: 3, aim: 2 },
+  treat: { label: "Treat them", emoji: "✨", maxTier: 4, aim: 4 },
 };
