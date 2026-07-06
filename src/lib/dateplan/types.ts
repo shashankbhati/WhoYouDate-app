@@ -70,7 +70,7 @@ export interface RoadmapStop {
   timeLabel?: string; // computed clock window, e.g. "18:30 – 19:30"
   estCents?: number; // per-person cost estimate for this stop (0 = free)
   venue?: Venue; // the chosen place, if the slot was filled
-  question?: Question; // what to ask here
+  questions: Question[]; // 3–4 things to ask here
   weatherNote?: string; // set when weather forces an indoor swap etc.
 }
 

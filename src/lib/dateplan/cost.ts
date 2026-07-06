@@ -1,21 +1,19 @@
-import type { VenueKind } from "./types";
+import type { Budget, VenueKind } from "./types";
 
-// ── Rough per-person cost estimates ───────────────────────────────────────────
-// Deterministic ballpark by price tier so we can show a running total. These are
-// intentionally approximate ("~") — the owner tunes them as real venues get
-// curated. Baseline is EUR cents; other currencies scale by a rough multiplier.
+// ── Cost model ────────────────────────────────────────────────────────────────
+// The displayed cost is anchored to the BUDGET as a spend-rate per hour, then
+// split across the paid stops. This guarantees:
+//   • total scales with the duration slider (more hours → more money),
+//   • budgets are clearly separated (cheap ≪ comfortable ≪ treat),
+//   • per-stop costs always add up to the total (no odd inversions).
 
-const TIER_EUR_CENTS: Record<number, number> = {
-  1: 800, // €8  — coffee / a scoop / a cheap bite
-  2: 1800, // €18 — a couple of drinks / casual meal
-  3: 3500, // €35 — a proper sit-down
-  4: 6000, // €60 — a treat
-};
-
-// Kinds that cost nothing (a walk by the river is free).
+// Free stops — a walk by the river costs nothing.
 const FREE_KINDS: VenueKind[] = ["walk", "park", "view"];
+export function isFreeKind(kind: VenueKind): boolean {
+  return FREE_KINDS.includes(kind);
+}
 
-// Rough FX vs EUR. Not live rates — just to keep the number sensible per market.
+// Rough FX vs EUR (not live rates — just to keep the number sensible per market).
 const CCY_MULT: Record<string, number> = {
   EUR: 1,
   USD: 1.1,
@@ -24,15 +22,18 @@ const CCY_MULT: Record<string, number> = {
   INR: 35,
 };
 
-export function estimateStopCents(
-  kind: VenueKind,
-  priceTier: number | undefined,
-  currency: string,
-): number {
-  if (FREE_KINDS.includes(kind)) return 0;
-  const base = TIER_EUR_CENTS[priceTier ?? 2] ?? TIER_EUR_CENTS[2];
+// Spend rate per hour, in EUR cents. Tuned so "cheap" ≈ €20 for ~3.5h and ≈ €35
+// for a half day, with comfortable/treat clearly above it.
+const BUDGET_EUR_PER_HOUR_CENTS: Record<Budget, number> = {
+  tight: 600, // ~€6/hr  → 3.5h ≈ €21, 6h ≈ €36
+  comfortable: 1300, // ~€13/hr → 3h ≈ €39
+  treat: 2600, // ~€26/hr → 3h ≈ €78
+};
+
+export function budgetTotalCents(budget: Budget, hours: number, currency: string): number {
+  const base = BUDGET_EUR_PER_HOUR_CENTS[budget] * hours;
   const mult = CCY_MULT[currency] ?? 1;
-  return Math.round((base * mult) / 100) * 100; // round to a whole unit
+  return Math.round((base * mult) / 100) * 100; // whole currency units
 }
 
 export function currencySymbol(currency: string): string {

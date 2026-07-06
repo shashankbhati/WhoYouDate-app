@@ -442,12 +442,19 @@ function PlanView({
                   <p className="mt-2 text-xs rounded-lg bg-muted px-3 py-2">{step.weatherNote}</p>
                 )}
 
-                {step.question && (
+                {step.questions.length > 0 && (
                   <div className="mt-3 rounded-xl bg-primary/5 border border-primary/15 px-3 py-2.5">
                     <p className="text-[11px] uppercase tracking-wider font-bold text-primary/80">
                       Ask here
                     </p>
-                    <p className="text-sm mt-0.5">“{step.question.text}”</p>
+                    <ul className="mt-1.5 space-y-1.5">
+                      {step.questions.map((q) => (
+                        <li key={q.text} className="text-sm flex gap-2">
+                          <span className="text-primary/50 shrink-0">›</span>
+                          <span>“{q.text}”</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>

@@ -258,3 +258,21 @@ export function pickQuestion(
   used.add(chosen.text);
   return chosen;
 }
+
+// Pick several distinct questions for one stop (default 3). Shares the `used`
+// set so questions never repeat across the whole plan.
+export function pickQuestions(
+  stage: Question["stage"],
+  ageRange: AgeRange,
+  used: Set<string>,
+  seed: number,
+  n = 3,
+): Question[] {
+  const out: Question[] = [];
+  for (let i = 0; i < n * 3 && out.length < n; i++) {
+    const q = pickQuestion(stage, ageRange, used, seed + i);
+    if (out.some((x) => x.text === q.text)) break; // pool exhausted
+    out.push(q);
+  }
+  return out;
+}

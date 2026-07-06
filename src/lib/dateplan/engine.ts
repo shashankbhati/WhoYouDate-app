@@ -2,6 +2,7 @@ import type {
   DatePlan,
   PlanInput,
   PlanStep,
+  RoadmapStop,
   Move,
   Venue,
   VenueKind,
@@ -11,9 +12,9 @@ import type {
 import { BUDGET_META } from "./types";
 import { templateFor, FILLERS } from "./templates";
 import type { StepSpec, StopSpec } from "./templates";
-import { pickQuestion } from "./questions";
+import { pickQuestions } from "./questions";
 import { MOVES } from "./moves";
-import { estimateStopCents } from "./cost";
+import { budgetTotalCents, isFreeKind } from "./cost";
 import type { WeatherHint } from "./weather";
 
 // Re-export the spec types the templates module owns so callers have one import.
@@ -77,10 +78,11 @@ function pickVenue(
     .map((v) => ({
       v,
       score:
-        (v.goodFor.includes(timeOfDay) ? 2 : 0) +
+        (v.goodFor.includes(timeOfDay) ? 1.5 : 0) +
         // gravitate to the budget's target tier — this is what makes the budget
-        // control actually change which venue (and cost) you get.
-        (2 - Math.abs((v.priceTier ?? 2) - aim)) +
+        // control actually change which venue (and cost) you get. Weighted high
+        // so budget beats a small rating edge when tier options exist.
+        2 * (2 - Math.abs((v.priceTier ?? 2) - aim)) +
         bandPriceFit(v.priceTier, band) * 0.3 +
         (v.rating ?? 0) / 5 +
         (used.has(v.id) ? -3 : 0),
@@ -221,14 +223,12 @@ export function buildPlan(
       weatherNote = `${weather.emoji} ${weather.summary} — perfect for being outside.`;
     }
 
-    const q = pickQuestion(spec.questionStage, ageRange, usedQ, stopSeed);
+    const qs = pickQuestions(spec.questionStage, ageRange, usedQ, stopSeed, 3);
     stopSeed++;
 
     const startMin = clock;
     const endMin = startMin + spec.minutes;
     clock = endMin + TRANSITION_MIN;
-    const estCents = venue ? estimateStopCents(venue.kind, venue.priceTier, currency) : 0;
-    totalCents += estCents;
 
     steps.push({
       type: "stop",
@@ -238,11 +238,23 @@ export function buildPlan(
       scene,
       minutes: spec.minutes,
       timeLabel: `${fmtClock(startMin)} – ${fmtClock(endMin)}`,
-      estCents,
+      estCents: 0, // filled by the budget allocation below
       venue,
-      question: q,
+      questions: qs,
       weatherNote,
     });
+  }
+
+  // Split the budget total across the paid stops (walks are free). This makes the
+  // cost scale with duration + budget and always add up — no per-venue inversions.
+  const target = budgetTotalCents(budget, durationHours, currency);
+  const paid = steps.filter(
+    (s): s is RoadmapStop => s.type === "stop" && !!s.venue && !isFreeKind(s.venue.kind),
+  );
+  if (paid.length > 0) {
+    const per = Math.max(100, Math.round(target / paid.length / 100) * 100);
+    paid.forEach((s) => (s.estCents = per));
+    totalCents = per * paid.length;
   }
 
   const totalMin = steps.reduce((a, s) => a + (s.type === "stop" ? s.minutes : 0), 0);
