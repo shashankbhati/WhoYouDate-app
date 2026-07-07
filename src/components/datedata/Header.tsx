@@ -178,7 +178,7 @@ function NotifBell({ notifs, unreadCount, onOpen }: { notifs: Notif[]; unreadCou
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-9 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
+        <div className="fixed left-2 right-2 top-16 md:absolute md:left-auto md:right-0 md:top-9 z-50 md:w-80 rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <span className="text-sm font-bold">Notifications</span>
             {unreadCount > 0 && <span className="text-xs text-primary font-semibold">{unreadCount} new</span>}

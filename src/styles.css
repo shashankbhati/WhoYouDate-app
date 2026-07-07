@@ -143,4 +143,25 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+
+  /* Stop iOS Safari from auto-zooming when a form field is focused: it triggers
+     whenever the control's font-size is < 16px. Enforce 16px on mobile only, so
+     desktop text-sm inputs are unaffected. */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
+
+  /* Remove the double-tap-to-zoom gesture on tap targets (a common source of
+     accidental zoom) while keeping intentional pinch-zoom for accessibility. */
+  button,
+  a,
+  [role="button"],
+  label,
+  summary {
+    touch-action: manipulation;
+  }
 }
