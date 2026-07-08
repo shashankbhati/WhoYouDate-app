@@ -9,7 +9,8 @@ import { createClient } from "@supabase/supabase-js";
 // Required env vars (Vercel → Settings → Environment Variables):
 //   SUPABASE_URL (or VITE_SUPABASE_URL)
 //   SUPABASE_SERVICE_ROLE_KEY   (server-only, bypasses RLS to write venues)
-//   FOURSQUARE_API_KEY          (free tier — https://foursquare.com/developers)
+//   FOURSQUARE_API_KEY          (Foursquare *Service* API Key — used as a Bearer
+//                                token against the new places-api.foursquare.com)
 //
 // Whitelist keeps API cost bounded: only these cities can be fetched, so nobody
 // can rack up calls by requesting arbitrary cities.
@@ -37,8 +38,10 @@ interface FsqPlace {
   name?: string;
   rating?: number; // 0–10
   price?: number; // 1–4
-  location?: { neighborhood?: string[]; locality?: string };
-  geocodes?: { main?: { latitude?: number; longitude?: number } };
+  latitude?: number; // new API may return coords flat…
+  longitude?: number;
+  location?: { neighborhood?: string[]; locality?: string; region?: string };
+  geocodes?: { main?: { latitude?: number; longitude?: number } }; // …or nested
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,11 +68,18 @@ async function fetchKind(
   q: { kind: string; query: string; goodFor: string[] },
   key: string,
 ) {
+  // New Foursquare Places API (the old api.foursquare.com/v3 was retired May 2026).
   const url =
-    `https://api.foursquare.com/v3/places/search?near=${encodeURIComponent(near)}` +
-    `&query=${encodeURIComponent(q.query)}&sort=RATING&limit=8` +
-    `&fields=name,rating,price,location,geocodes`;
-  const res = await fetch(url, { headers: { Authorization: key, Accept: "application/json" } });
+    `https://places-api.foursquare.com/places/search?near=${encodeURIComponent(near)}` +
+    `&query=${encodeURIComponent(q.query)}&limit=10` +
+    `&fields=${encodeURIComponent("name,rating,price,location,geocodes")}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "X-Places-Api-Version": "2025-06-17",
+      Accept: "application/json",
+    },
+  });
   if (!res.ok) return [];
   const data = (await res.json()) as { results?: FsqPlace[] };
   const seen = new Set<string>();
@@ -87,9 +97,9 @@ async function fetchKind(
       price_tier: p.price ?? null,
       vibe_tags: [],
       good_for: q.goodFor,
-      area: p.location?.neighborhood?.[0] ?? p.location?.locality ?? null,
-      lat: p.geocodes?.main?.latitude ?? null,
-      lon: p.geocodes?.main?.longitude ?? null,
+      area: p.location?.neighborhood?.[0] ?? p.location?.locality ?? p.location?.region ?? null,
+      lat: p.geocodes?.main?.latitude ?? p.latitude ?? null,
+      lon: p.geocodes?.main?.longitude ?? p.longitude ?? null,
       note: null,
       source: "foursquare",
     });
