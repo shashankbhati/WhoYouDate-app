@@ -80,7 +80,7 @@ async function fetchKind(
   const url =
     `https://places-api.foursquare.com/places/search?near=${encodeURIComponent(near)}` +
     `&query=${encodeURIComponent(q.query)}&limit=10` +
-    `&fields=${encodeURIComponent("name,location,geocodes")}`;
+    `&fields=${encodeURIComponent("name,location,latitude,longitude")}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${key}`,
