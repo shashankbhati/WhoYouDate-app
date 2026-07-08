@@ -128,51 +128,65 @@ async function fetchOsm(
     `way["leisure"="park"]["name"](${bbox});` +
     `node["tourism"="viewpoint"]["name"](${bbox});` +
     `);out center 25;`;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 9000); // plenty for a bbox query
-  try {
-    // GET with ?data= — Overpass 406s on a raw POST body from undici (Vercel).
-    const res = await fetch(
-      `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`,
-      { signal: ctrl.signal },
-    );
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      return { rows: [], note: `http ${res.status}: ${body.slice(0, 120)}` };
+  // GET with ?data= and a descriptive User-Agent — Overpass's proxy 406s a raw
+  // POST body and requests without a User-Agent (Vercel's fetch omits one).
+  const overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`;
+  const headers = {
+    "User-Agent": "whoamidating.singles/1.0 (+https://www.whoamidating.singles)",
+    Accept: "application/json",
+  };
+
+  let note = "failed";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 9000); // plenty for a bbox query
+    try {
+      const res = await fetch(overpassUrl, { headers, signal: ctrl.signal });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        note = `http ${res.status}: ${body.slice(0, 100)}`;
+        // 429/5xx are transient (load) — wait and retry once.
+        if (res.status === 429 || res.status >= 500) {
+          await new Promise((r) => setTimeout(r, 900));
+          continue;
+        }
+        return { rows: [], note };
+      }
+      const data = (await res.json()) as { elements?: OverpassEl[] };
+      const seen = new Set<string>();
+      const out: Record<string, unknown>[] = [];
+      for (const el of data.elements ?? []) {
+        const name = el.tags?.name?.trim();
+        if (!name || seen.has(name.toLowerCase())) continue;
+        const kind =
+          el.tags?.tourism === "viewpoint" ? "view" : el.tags?.waterway ? "walk" : "park";
+        const elat = el.lat ?? el.center?.lat ?? null;
+        const elon = el.lon ?? el.center?.lon ?? null;
+        seen.add(name.toLowerCase());
+        out.push({
+          city,
+          name,
+          kind,
+          rating: null,
+          price_tier: null,
+          vibe_tags: [],
+          good_for: ALL_TIMES, // a walk works any time of day
+          area: null,
+          lat: elat,
+          lon: elon,
+          note: null,
+          source: "osm",
+        });
+        if (out.length >= 15) break;
+      }
+      return { rows: out, note: out.length === 0 ? "0 elements" : undefined };
+    } catch (err) {
+      note = `error: ${String(err).slice(0, 100)}`; // abort/timeout — retry once
+    } finally {
+      clearTimeout(timer);
     }
-    const data = (await res.json()) as { elements?: OverpassEl[] };
-    const seen = new Set<string>();
-    const out: Record<string, unknown>[] = [];
-    for (const el of data.elements ?? []) {
-      const name = el.tags?.name?.trim();
-      if (!name || seen.has(name.toLowerCase())) continue;
-      const kind = el.tags?.tourism === "viewpoint" ? "view" : el.tags?.waterway ? "walk" : "park";
-      const elat = el.lat ?? el.center?.lat ?? null;
-      const elon = el.lon ?? el.center?.lon ?? null;
-      seen.add(name.toLowerCase());
-      out.push({
-        city,
-        name,
-        kind,
-        rating: null,
-        price_tier: null,
-        vibe_tags: [],
-        good_for: ALL_TIMES, // a walk works any time of day
-        area: null,
-        lat: elat,
-        lon: elon,
-        note: null,
-        source: "osm",
-      });
-      if (out.length >= 15) break;
-    }
-    return { rows: out, note: out.length === 0 ? "0 elements" : undefined };
-  } catch (err) {
-    // best-effort: an OSM failure never blocks the venue import
-    return { rows: [], note: `error: ${String(err).slice(0, 120)}` };
-  } finally {
-    clearTimeout(timer);
   }
+  return { rows: [], note }; // best-effort: OSM failure never blocks the import
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
