@@ -1,7 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuthState, openAuthModal } from "@/lib/auth";
-import { useDatePlanStore, addVenue, deleteVenue, venuesForCity } from "@/lib/dateplan/store";
+import {
+  useDatePlanStore,
+  addVenue,
+  deleteVenue,
+  venuesForCity,
+  addCity,
+  deleteCity,
+  type PlanCity,
+} from "@/lib/dateplan/store";
 import type { VenueKind, TimeOfDay } from "@/lib/dateplan/types";
 import { toast } from "sonner";
 
@@ -98,6 +106,9 @@ function PlanAdmin() {
 
   return (
     <Shell>
+      <CitiesManager />
+
+      <h2 className="mt-8 mb-3 font-bold">Add a venue by hand</h2>
       <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
           <L label="City">
@@ -248,6 +259,108 @@ function PlanAdmin() {
 
 const inp =
   "w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40";
+
+// Manage which cities auto-import venues (Foursquare + OSM). Adding a city here
+// needs no code change — it's stored in plan_cities and imported on first use.
+function CitiesManager() {
+  const { cities } = useDatePlanStore();
+  const [input, setInput] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  async function add() {
+    const q = input.trim();
+    if (!q) return toast.error("Enter a city name.");
+    setAdding(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1`,
+      );
+      const data = await res.json();
+      if (!data[0]) return toast.error("Couldn't find that city.");
+      const r = data[0];
+      const cityName =
+        r.address?.city ??
+        r.address?.town ??
+        r.address?.village ??
+        r.display_name.split(",")[0].trim();
+      const country = r.address?.country ?? "";
+      const near = country ? `${cityName}, ${country}` : cityName;
+      const result = await addCity({
+        city: cityName,
+        near,
+        lat: parseFloat(r.lat),
+        lon: parseFloat(r.lon),
+      });
+      if (!result.ok) return toast.error(result.error ?? "Could not add city.");
+      toast.success(`Added ${cityName} — importing venues…`);
+      setInput("");
+      // Kick off the import now so venues are ready before anyone plans there.
+      fetch(`/api/venues?city=${encodeURIComponent(cityName)}`).catch(() => {});
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function remove(c: PlanCity) {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Remove ${c.city} and its imported venues?`)
+    )
+      return;
+    await deleteCity(c.city);
+    toast.success(`Removed ${c.city}`);
+  }
+
+  return (
+    <div>
+      <h2 className="mb-1 font-bold">Auto-import cities 🌍</h2>
+      <p className="text-muted-foreground text-sm mb-3">
+        Add a city and its venues (Foursquare) + parks/rivers (OpenStreetMap) import automatically —
+        no code change needed.
+      </p>
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex gap-2">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+            placeholder="e.g. Munich, Bangalore, New York…"
+            className={inp}
+          />
+          <button
+            onClick={add}
+            disabled={adding}
+            className="shrink-0 rounded-full bg-primary text-primary-foreground px-5 font-semibold hover:opacity-90 transition disabled:opacity-60"
+          >
+            {adding ? "Adding…" : "Add"}
+          </button>
+        </div>
+
+        {cities.length > 0 && (
+          <ul className="mt-4 space-y-2">
+            {cities.map((c) => (
+              <li
+                key={c.city}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 px-4 py-2.5"
+              >
+                <span className="text-sm font-semibold">
+                  🌍 {c.city}
+                  {!c.enabled && <span className="text-xs text-muted-foreground"> (disabled)</span>}
+                </span>
+                <button
+                  onClick={() => remove(c)}
+                  className="text-xs text-rose-500 hover:underline shrink-0"
+                >
+                  remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function L({ label, children }: { label: string; children: React.ReactNode }) {
   return (

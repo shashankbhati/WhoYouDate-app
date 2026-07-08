@@ -66,6 +66,7 @@ async function load() {
   } finally {
     _loading = false;
   }
+  await loadCities();
   await checkAdmin();
 }
 
@@ -99,8 +100,43 @@ export function venuesForCity(city: string): Venue[] {
   return _venues.filter((v) => v.city.toLowerCase() === key);
 }
 
-// Cities whose venues are auto-imported server-side rather than hand-curated.
-const AUTO_CITIES = new Set(["berlin"]);
+// ── Auto-import cities (admin-managed whitelist in plan_cities) ────────────────
+export interface PlanCity {
+  city: string;
+  near: string;
+  lat?: number;
+  lon?: number;
+  enabled: boolean;
+}
+let _cities: PlanCity[] = [];
+let _citiesLoaded = false;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToCity(r: any): PlanCity {
+  return {
+    city: r.city,
+    near: r.near,
+    lat: r.lat ?? undefined,
+    lon: r.lon ?? undefined,
+    enabled: r.enabled,
+  };
+}
+
+async function loadCities(force = false): Promise<PlanCity[]> {
+  if (_citiesLoaded && !force) return _cities;
+  try {
+    const { data } = await supabase.from("plan_cities").select("*");
+    _cities = (data ?? []).map(rowToCity);
+    _citiesLoaded = true;
+  } catch {
+    /* table missing / offline — no auto cities */
+  }
+  return _cities;
+}
+
+export function getCities(): PlanCity[] {
+  return _cities;
+}
 
 // For an auto-import city, ensure its venues are loaded — fetching once from
 // /api/venues (which caches into Supabase) if we don't already have them. Other
@@ -108,7 +144,9 @@ const AUTO_CITIES = new Set(["berlin"]);
 export async function ensureCityVenues(city: string): Promise<void> {
   if (typeof window === "undefined") return;
   const key = city.trim().toLowerCase();
-  if (!AUTO_CITIES.has(key)) return;
+  await loadCities();
+  const isAuto = _cities.some((c) => c.enabled && c.city.toLowerCase() === key);
+  if (!isAuto) return;
   if (_venues.some((v) => v.city.toLowerCase() === key && !v.seed)) return;
   try {
     const res = await fetch(`/api/venues?city=${encodeURIComponent(city)}`);
@@ -121,6 +159,47 @@ export async function ensureCityVenues(city: string): Promise<void> {
   } catch {
     /* network/provider error — falls back to the generic template */
   }
+}
+
+// ── Admin: manage which cities auto-import ────────────────────────────────────
+export async function addCity(d: {
+  city: string;
+  near: string;
+  lat?: number;
+  lon?: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (typeof window === "undefined") return { ok: false };
+  await ensureAuth();
+  const { error } = await supabase.from("plan_cities").insert({
+    city: d.city.trim(),
+    near: d.near.trim(),
+    lat: d.lat ?? null,
+    lon: d.lon ?? null,
+    enabled: true,
+  });
+  if (error) {
+    if ((error as { code?: string }).code === "23505")
+      return { ok: false, error: "City already added." };
+    const msg = /row-level security|permission/i.test(error.message)
+      ? "Not authorized — add your login email to the admins table first."
+      : /does not exist|schema cache/i.test(error.message)
+        ? "plan_cities table not found — run migration_plan_cities.sql in Supabase."
+        : error.message;
+    return { ok: false, error: msg };
+  }
+  await loadCities(true);
+  emit();
+  return { ok: true };
+}
+
+export async function deleteCity(city: string): Promise<void> {
+  if (typeof window === "undefined") return;
+  await supabase.from("plan_cities").delete().ilike("city", city);
+  // also drop that city's auto-imported venues
+  await supabase.from("venues").delete().ilike("city", city).in("source", ["foursquare", "osm"]);
+  _venues = _venues.filter((v) => v.city.toLowerCase() !== city.toLowerCase());
+  await loadCities(true);
+  emit();
 }
 
 // ── Admin writes ──────────────────────────────────────────────────────────────
@@ -227,5 +306,5 @@ export function useDatePlanStore() {
       listeners.delete(l);
     };
   }, []);
-  return { venues: _venues, isAdmin: _isAdmin };
+  return { venues: _venues, isAdmin: _isAdmin, cities: _cities };
 }

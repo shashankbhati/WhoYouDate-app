@@ -2,30 +2,21 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 
 // ============================================================
-// Auto-import venues for supported cities from Foursquare, cache them in
-// Supabase, and serve from cache thereafter. Called by the client the first
-// time someone plans a date in a supported city; idempotent and rate-safe.
+// Auto-import venues for whitelisted cities and cache them in Supabase.
+//   • Cafés/bars/restaurants/dessert/activity  → Foursquare (new Places API)
+//   • Walk landmarks (parks, viewpoints, rivers) → OpenStreetMap / Overpass (free)
+// The whitelist lives in the `plan_cities` table (managed in /plan-admin), so new
+// cities need no code change. Called by the client the first time someone plans a
+// date in a supported city; idempotent, cached ~25 days, rate-safe.
 //
-// Required env vars (Vercel → Settings → Environment Variables):
-//   SUPABASE_URL (or VITE_SUPABASE_URL)
-//   SUPABASE_SERVICE_ROLE_KEY   (server-only, bypasses RLS to write venues)
-//   FOURSQUARE_API_KEY          (Foursquare *Service* API Key — used as a Bearer
-//                                token against the new places-api.foursquare.com)
-//
-// Whitelist keeps API cost bounded: only these cities can be fetched, so nobody
-// can rack up calls by requesting arbitrary cities.
+// Env: SUPABASE_URL (or VITE_SUPABASE_URL), SUPABASE_SERVICE_ROLE_KEY,
+//      FOURSQUARE_API_KEY (Service API key → Bearer on places-api.foursquare.com).
 // ============================================================
 
-const SUPPORTED: Record<string, { near: string }> = {
-  berlin: { near: "Berlin, Germany" },
-};
+export const config = { maxDuration: 30 };
 
-// Refresh cadence — venues barely change, and Foursquare's terms expect refresh
-// rather than permanent storage. 25 days keeps us well within that.
 const MAX_AGE_MS = 25 * 24 * 60 * 60 * 1000;
 
-// Our roadmap slots → a Foursquare free-text query + when the venue fits.
-// (Free-text `query` is more robust than category IDs, which change.)
 const KINDS: { kind: string; query: string; goodFor: string[] }[] = [
   { kind: "cafe", query: "coffee", goodFor: ["morning", "afternoon"] },
   { kind: "bar", query: "cocktail bar", goodFor: ["evening", "night"] },
@@ -34,14 +25,17 @@ const KINDS: { kind: string; query: string; goodFor: string[] }[] = [
   { kind: "activity", query: "billiards bowling", goodFor: ["evening", "night"] },
 ];
 
+const ALL_TIMES = ["morning", "afternoon", "evening", "night"];
+
 interface FsqPlace {
   name?: string;
-  rating?: number; // 0–10
-  price?: number; // 1–4
-  latitude?: number; // new API may return coords flat…
+  latitude?: number;
   longitude?: number;
   location?: { neighborhood?: string[]; locality?: string; region?: string };
-  geocodes?: { main?: { latitude?: number; longitude?: number } }; // …or nested
+}
+interface KindResult {
+  rows: Record<string, unknown>[];
+  err?: { status: number; body: string };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -63,20 +57,13 @@ function rowToVenue(r: any) {
   };
 }
 
-interface KindResult {
-  rows: Record<string, unknown>[];
-  err?: { status: number; body: string };
-}
-
+// ── Foursquare (paid-free core fields only: name, location, coords) ───────────
 async function fetchKind(
+  city: string,
   near: string,
   q: { kind: string; query: string; goodFor: string[] },
   key: string,
 ): Promise<KindResult> {
-  // New Foursquare Places API (the old api.foursquare.com/v3 was retired May 2026).
-  // Only free/core fields — `rating` and `price` are Premium and require paid
-  // credits (they 429 the whole call on the free tier). We keep parsing them in
-  // case billing is enabled later, but don't request them by default.
   const url =
     `https://places-api.foursquare.com/places/search?near=${encodeURIComponent(near)}` +
     `&query=${encodeURIComponent(q.query)}&limit=10` +
@@ -100,17 +87,16 @@ async function fetchKind(
     if (!name || seen.has(name.toLowerCase())) continue;
     seen.add(name.toLowerCase());
     out.push({
-      city: "Berlin",
+      city,
       name,
       kind: q.kind,
-      // Foursquare rates 0–10; our scale is 0–5.
-      rating: p.rating != null ? Math.round((p.rating / 2) * 10) / 10 : null,
-      price_tier: p.price ?? null,
+      rating: null, // Premium field — omitted on the free tier
+      price_tier: null,
       vibe_tags: [],
       good_for: q.goodFor,
       area: p.location?.neighborhood?.[0] ?? p.location?.locality ?? p.location?.region ?? null,
-      lat: p.geocodes?.main?.latitude ?? p.latitude ?? null,
-      lon: p.geocodes?.main?.longitude ?? p.longitude ?? null,
+      lat: p.latitude ?? null,
+      lon: p.longitude ?? null,
       note: null,
       source: "foursquare",
     });
@@ -118,52 +104,125 @@ async function fetchKind(
   return { rows: out };
 }
 
+// ── OpenStreetMap / Overpass (free landmarks: parks, viewpoints, rivers) ──────
+interface OverpassEl {
+  tags?: { name?: string; leisure?: string; tourism?: string; waterway?: string };
+  lat?: number;
+  lon?: number;
+  center?: { lat?: number; lon?: number };
+}
+async function fetchOsm(
+  city: string,
+  lat: number,
+  lon: number,
+): Promise<Record<string, unknown>[]> {
+  const q =
+    `[out:json][timeout:15];(` +
+    `way["leisure"="park"]["name"](around:4000,${lat},${lon});` +
+    `relation["leisure"="park"]["name"](around:4000,${lat},${lon});` +
+    `node["tourism"="viewpoint"]["name"](around:6000,${lat},${lon});` +
+    `way["waterway"="riverbank"]["name"](around:3000,${lat},${lon});` +
+    `);out center 30;`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000); // stay well under the function limit
+  try {
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: q,
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { elements?: OverpassEl[] };
+    const seen = new Set<string>();
+    const out: Record<string, unknown>[] = [];
+    for (const el of data.elements ?? []) {
+      const name = el.tags?.name?.trim();
+      if (!name || seen.has(name.toLowerCase())) continue;
+      const kind = el.tags?.tourism === "viewpoint" ? "view" : el.tags?.waterway ? "walk" : "park";
+      const elat = el.lat ?? el.center?.lat ?? null;
+      const elon = el.lon ?? el.center?.lon ?? null;
+      seen.add(name.toLowerCase());
+      out.push({
+        city,
+        name,
+        kind,
+        rating: null,
+        price_tier: null,
+        vibe_tags: [],
+        good_for: ALL_TIMES, // a walk works any time of day
+        area: null,
+        lat: elat,
+        lon: elon,
+        note: null,
+        source: "osm",
+      });
+      if (out.length >= 15) break;
+    }
+    return out;
+  } catch {
+    return []; // best-effort: an OSM failure never blocks the venue import
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const cityParam = String(req.query.city ?? "")
     .trim()
     .toLowerCase();
-  const supported = SUPPORTED[cityParam];
-  if (!supported) return res.status(400).json({ error: "City not supported" });
+  if (!cityParam) return res.status(400).json({ error: "Missing city" });
 
   const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const fsqKey = process.env.FOURSQUARE_API_KEY;
   if (!supabaseUrl || !serviceKey) return res.status(500).json({ error: "Missing Supabase env" });
   const db = createClient(supabaseUrl, serviceKey);
 
-  // Serve from cache if we have fresh auto-imported venues for this city.
+  // Whitelist check (admin-managed table, not code).
+  const { data: cityRow } = await db
+    .from("plan_cities")
+    .select("*")
+    .ilike("city", cityParam)
+    .eq("enabled", true)
+    .maybeSingle();
+  if (!cityRow) return res.status(400).json({ error: "City not supported" });
+  const displayCity: string = cityRow.city;
+
+  // Serve from cache if we already have fresh auto rows for this city.
   const cutoff = new Date(Date.now() - MAX_AGE_MS).toISOString();
   const { data: fresh } = await db
     .from("venues")
     .select("*")
-    .ilike("city", cityParam)
-    .eq("source", "foursquare")
+    .ilike("city", displayCity)
+    .in("source", ["foursquare", "osm"])
     .gte("created_at", cutoff);
   if (fresh && fresh.length > 0) {
     return res.status(200).json({ venues: fresh.map(rowToVenue), cached: true });
   }
 
+  const fsqKey = process.env.FOURSQUARE_API_KEY;
   if (!fsqKey) return res.status(500).json({ error: "Missing FOURSQUARE_API_KEY" });
 
-  // Fetch fresh from Foursquare.
-  let batches: KindResult[] = [];
-  try {
-    batches = await Promise.all(KINDS.map((k) => fetchKind(supported.near, k, fsqKey)));
-  } catch (err) {
-    return res.status(502).json({ error: "Provider fetch threw", detail: String(err) });
-  }
-  const rows = batches.flatMap((b) => b.rows);
+  // Fetch venues (Foursquare) and landmarks (OSM) in parallel.
+  const [batches, osmRows] = await Promise.all([
+    Promise.all(KINDS.map((k) => fetchKind(displayCity, cityRow.near, k, fsqKey))),
+    cityRow.lat != null && cityRow.lon != null
+      ? fetchOsm(displayCity, cityRow.lat, cityRow.lon)
+      : Promise.resolve([]),
+  ]).catch((err) => {
+    throw err;
+  });
+
+  const rows = [...batches.flatMap((b) => b.rows), ...osmRows];
   if (rows.length === 0) {
-    // Surface Foursquare's actual response so we can see auth/version/param issues.
     const firstErr = batches.find((b) => b.err)?.err ?? null;
     return res.status(502).json({ error: "No venues returned", provider: firstErr });
   }
 
   // Replace this city's previous auto rows, then insert the fresh set.
-  await db.from("venues").delete().ilike("city", cityParam).eq("source", "foursquare");
+  await db.from("venues").delete().ilike("city", displayCity).in("source", ["foursquare", "osm"]);
   const { data: inserted, error } = await db.from("venues").insert(rows).select();
   if (error) {
-    // `source` column missing → migration not run yet.
     const msg = /source/.test(error.message)
       ? "Run migration_venues_source.sql in Supabase first."
       : error.message;
