@@ -63,11 +63,16 @@ function rowToVenue(r: any) {
   };
 }
 
+interface KindResult {
+  rows: Record<string, unknown>[];
+  err?: { status: number; body: string };
+}
+
 async function fetchKind(
   near: string,
   q: { kind: string; query: string; goodFor: string[] },
   key: string,
-) {
+): Promise<KindResult> {
   // New Foursquare Places API (the old api.foursquare.com/v3 was retired May 2026).
   const url =
     `https://places-api.foursquare.com/places/search?near=${encodeURIComponent(near)}` +
@@ -76,11 +81,14 @@ async function fetchKind(
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${key}`,
-      "X-Places-Api-Version": "2025-06-17",
+      "X-Places-Api-Version": "2025-02-05",
       Accept: "application/json",
     },
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    return { rows: [], err: { status: res.status, body: body.slice(0, 400) } };
+  }
   const data = (await res.json()) as { results?: FsqPlace[] };
   const seen = new Set<string>();
   const out: Record<string, unknown>[] = [];
@@ -104,7 +112,7 @@ async function fetchKind(
       source: "foursquare",
     });
   }
-  return out;
+  return { rows: out };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -135,15 +143,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!fsqKey) return res.status(500).json({ error: "Missing FOURSQUARE_API_KEY" });
 
   // Fetch fresh from Foursquare.
-  let rows: Record<string, unknown>[] = [];
+  let batches: KindResult[] = [];
   try {
-    const batches = await Promise.all(KINDS.map((k) => fetchKind(supported.near, k, fsqKey)));
-    rows = batches.flat();
+    batches = await Promise.all(KINDS.map((k) => fetchKind(supported.near, k, fsqKey)));
   } catch (err) {
-    console.error("[venues] Foursquare fetch failed:", err);
-    return res.status(502).json({ error: "Provider fetch failed" });
+    return res.status(502).json({ error: "Provider fetch threw", detail: String(err) });
   }
-  if (rows.length === 0) return res.status(502).json({ error: "No venues returned" });
+  const rows = batches.flatMap((b) => b.rows);
+  if (rows.length === 0) {
+    // Surface Foursquare's actual response so we can see auth/version/param issues.
+    const firstErr = batches.find((b) => b.err)?.err ?? null;
+    return res.status(502).json({ error: "No venues returned", provider: firstErr });
+  }
 
   // Replace this city's previous auto rows, then insert the fresh set.
   await db.from("venues").delete().ilike("city", cityParam).eq("source", "foursquare");
