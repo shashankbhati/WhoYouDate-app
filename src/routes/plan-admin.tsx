@@ -8,6 +8,7 @@ import {
   venuesForCity,
   addCity,
   deleteCity,
+  reimportCity,
   type PlanCity,
 } from "@/lib/dateplan/store";
 import type { VenueKind, TimeOfDay } from "@/lib/dateplan/types";
@@ -266,6 +267,15 @@ function CitiesManager() {
   const { cities } = useDatePlanStore();
   const [input, setInput] = useState("");
   const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function reimport(c: PlanCity) {
+    setBusy(c.city);
+    const res = await reimportCity(c.city);
+    setBusy(null);
+    if (res.ok) toast.success(`Re-imported ${c.city} 🎉`);
+    else toast.error(res.error ?? "Re-import failed");
+  }
 
   async function add() {
     const q = input.trim();
@@ -347,12 +357,21 @@ function CitiesManager() {
                   🌍 {c.city}
                   {!c.enabled && <span className="text-xs text-muted-foreground"> (disabled)</span>}
                 </span>
-                <button
-                  onClick={() => remove(c)}
-                  className="text-xs text-rose-500 hover:underline shrink-0"
-                >
-                  remove
-                </button>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    onClick={() => reimport(c)}
+                    disabled={busy === c.city}
+                    className="text-xs text-primary hover:underline disabled:opacity-60"
+                  >
+                    {busy === c.city ? "importing…" : "re-import"}
+                  </button>
+                  <button
+                    onClick={() => remove(c)}
+                    className="text-xs text-rose-500 hover:underline"
+                  >
+                    remove
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

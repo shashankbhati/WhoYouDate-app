@@ -116,15 +116,20 @@ async function fetchOsm(
   lat: number,
   lon: number,
 ): Promise<Record<string, unknown>[]> {
+  // A bounding box (~7 km) uses Overpass's spatial index and returns in <1s —
+  // an `around:radius` query does per-element distance math and takes 15s+.
+  const dLat = 0.035;
+  const dLon = 0.05;
+  const bbox =
+    `${(lat - dLat).toFixed(4)},${(lon - dLon).toFixed(4)},` +
+    `${(lat + dLat).toFixed(4)},${(lon + dLon).toFixed(4)}`;
   const q =
-    `[out:json][timeout:15];(` +
-    `way["leisure"="park"]["name"](around:4000,${lat},${lon});` +
-    `relation["leisure"="park"]["name"](around:4000,${lat},${lon});` +
-    `node["tourism"="viewpoint"]["name"](around:6000,${lat},${lon});` +
-    `way["waterway"="riverbank"]["name"](around:3000,${lat},${lon});` +
-    `);out center 30;`;
+    `[out:json][timeout:20];(` +
+    `way["leisure"="park"]["name"](${bbox});` +
+    `node["tourism"="viewpoint"]["name"](${bbox});` +
+    `);out center 25;`;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 8000); // stay well under the function limit
+  const timer = setTimeout(() => ctrl.abort(), 9000); // plenty for a bbox query
   try {
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",

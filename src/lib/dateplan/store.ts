@@ -202,6 +202,38 @@ export async function deleteCity(city: string): Promise<void> {
   emit();
 }
 
+// Force a fresh import: clear the city's cached auto venues (so the endpoint
+// refetches instead of serving stale cache), then re-run the import.
+export async function reimportCity(city: string): Promise<{ ok: boolean; error?: string }> {
+  if (typeof window === "undefined") return { ok: false };
+  await ensureAuth();
+  const { error } = await supabase
+    .from("venues")
+    .delete()
+    .ilike("city", city)
+    .in("source", ["foursquare", "osm"]);
+  if (error) {
+    const msg = /row-level security|permission/i.test(error.message)
+      ? "Not authorized — add your login email to the admins table first."
+      : error.message;
+    return { ok: false, error: msg };
+  }
+  _venues = _venues.filter((v) => !(v.city.toLowerCase() === city.toLowerCase() && !v.seed));
+  emit();
+  try {
+    const res = await fetch(`/api/venues?city=${encodeURIComponent(city)}`);
+    const data = (await res.json()) as { venues?: Venue[]; error?: string; provider?: unknown };
+    if (!res.ok) return { ok: false, error: data.error ?? "Import failed" };
+    if (data.venues && data.venues.length) {
+      _venues = [...data.venues, ..._venues];
+      emit();
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
 // ── Admin writes ──────────────────────────────────────────────────────────────
 export interface VenueDraft {
   city: string;
