@@ -273,8 +273,12 @@ function CitiesManager() {
     setBusy(c.city);
     const res = await reimportCity(c.city);
     setBusy(null);
-    if (res.ok) toast.success(`Re-imported ${c.city} 🎉`);
-    else toast.error(res.error ?? "Re-import failed");
+    if (res.ok) {
+      const lm = res.landmarks ?? 0;
+      toast.success(
+        `Re-imported ${c.city} — ${lm} landmark${lm === 1 ? "" : "s"}${lm === 0 && res.osmNote ? ` (OSM: ${res.osmNote})` : ""}`,
+      );
+    } else toast.error(res.error ?? "Re-import failed");
   }
 
   async function add() {

@@ -204,7 +204,9 @@ export async function deleteCity(city: string): Promise<void> {
 
 // Force a fresh import: clear the city's cached auto venues (so the endpoint
 // refetches instead of serving stale cache), then re-run the import.
-export async function reimportCity(city: string): Promise<{ ok: boolean; error?: string }> {
+export async function reimportCity(
+  city: string,
+): Promise<{ ok: boolean; error?: string; landmarks?: number; osmNote?: string }> {
   if (typeof window === "undefined") return { ok: false };
   await ensureAuth();
   const { error } = await supabase
@@ -222,13 +224,18 @@ export async function reimportCity(city: string): Promise<{ ok: boolean; error?:
   emit();
   try {
     const res = await fetch(`/api/venues?city=${encodeURIComponent(city)}`);
-    const data = (await res.json()) as { venues?: Venue[]; error?: string; provider?: unknown };
+    const data = (await res.json()) as {
+      venues?: Venue[];
+      error?: string;
+      landmarks?: number;
+      osmNote?: string;
+    };
     if (!res.ok) return { ok: false, error: data.error ?? "Import failed" };
     if (data.venues && data.venues.length) {
       _venues = [...data.venues, ..._venues];
       emit();
     }
-    return { ok: true };
+    return { ok: true, landmarks: data.landmarks, osmNote: data.osmNote };
   } catch {
     return { ok: false, error: "Network error" };
   }

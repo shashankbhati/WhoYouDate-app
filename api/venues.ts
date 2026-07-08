@@ -115,7 +115,7 @@ async function fetchOsm(
   city: string,
   lat: number,
   lon: number,
-): Promise<Record<string, unknown>[]> {
+): Promise<{ rows: Record<string, unknown>[]; note?: string }> {
   // A bounding box (~7 km) uses Overpass's spatial index and returns in <1s —
   // an `around:radius` query does per-element distance math and takes 15s+.
   const dLat = 0.035;
@@ -137,7 +137,10 @@ async function fetchOsm(
       body: q,
       signal: ctrl.signal,
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { rows: [], note: `http ${res.status}: ${body.slice(0, 120)}` };
+    }
     const data = (await res.json()) as { elements?: OverpassEl[] };
     const seen = new Set<string>();
     const out: Record<string, unknown>[] = [];
@@ -164,9 +167,10 @@ async function fetchOsm(
       });
       if (out.length >= 15) break;
     }
-    return out;
-  } catch {
-    return []; // best-effort: an OSM failure never blocks the venue import
+    return { rows: out, note: out.length === 0 ? "0 elements" : undefined };
+  } catch (err) {
+    // best-effort: an OSM failure never blocks the venue import
+    return { rows: [], note: `error: ${String(err).slice(0, 120)}` };
   } finally {
     clearTimeout(timer);
   }
@@ -202,23 +206,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .in("source", ["foursquare", "osm"])
     .gte("created_at", cutoff);
   if (fresh && fresh.length > 0) {
-    return res.status(200).json({ venues: fresh.map(rowToVenue), cached: true });
+    const landmarks = fresh.filter((r) => r.source === "osm").length;
+    return res.status(200).json({ venues: fresh.map(rowToVenue), cached: true, landmarks });
   }
 
   const fsqKey = process.env.FOURSQUARE_API_KEY;
   if (!fsqKey) return res.status(500).json({ error: "Missing FOURSQUARE_API_KEY" });
 
   // Fetch venues (Foursquare) and landmarks (OSM) in parallel.
-  const [batches, osmRows] = await Promise.all([
+  const emptyOsm = {
+    rows: [] as Record<string, unknown>[],
+    note: "no coords" as string | undefined,
+  };
+  const [batches, osm] = await Promise.all([
     Promise.all(KINDS.map((k) => fetchKind(displayCity, cityRow.near, k, fsqKey))),
     cityRow.lat != null && cityRow.lon != null
       ? fetchOsm(displayCity, cityRow.lat, cityRow.lon)
-      : Promise.resolve([]),
-  ]).catch((err) => {
-    throw err;
-  });
+      : Promise.resolve(emptyOsm),
+  ]);
 
-  const rows = [...batches.flatMap((b) => b.rows), ...osmRows];
+  const rows = [...batches.flatMap((b) => b.rows), ...osm.rows];
   if (rows.length === 0) {
     const firstErr = batches.find((b) => b.err)?.err ?? null;
     return res.status(502).json({ error: "No venues returned", provider: firstErr });
@@ -234,5 +241,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: msg });
   }
 
-  return res.status(200).json({ venues: (inserted ?? []).map(rowToVenue), cached: false });
+  return res.status(200).json({
+    venues: (inserted ?? []).map(rowToVenue),
+    cached: false,
+    landmarks: osm.rows.length,
+    osmNote: osm.note ?? null,
+  });
 }
