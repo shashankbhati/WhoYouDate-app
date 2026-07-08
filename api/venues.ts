@@ -131,12 +131,11 @@ async function fetchOsm(
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 9000); // plenty for a bbox query
   try {
-    const res = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: q,
-      signal: ctrl.signal,
-    });
+    // GET with ?data= — Overpass 406s on a raw POST body from undici (Vercel).
+    const res = await fetch(
+      `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`,
+      { signal: ctrl.signal },
+    );
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       return { rows: [], note: `http ${res.status}: ${body.slice(0, 120)}` };
