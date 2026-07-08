@@ -99,6 +99,30 @@ export function venuesForCity(city: string): Venue[] {
   return _venues.filter((v) => v.city.toLowerCase() === key);
 }
 
+// Cities whose venues are auto-imported server-side rather than hand-curated.
+const AUTO_CITIES = new Set(["berlin"]);
+
+// For an auto-import city, ensure its venues are loaded — fetching once from
+// /api/venues (which caches into Supabase) if we don't already have them. Other
+// cities are unaffected and keep the existing (curated/seed) behaviour.
+export async function ensureCityVenues(city: string): Promise<void> {
+  if (typeof window === "undefined") return;
+  const key = city.trim().toLowerCase();
+  if (!AUTO_CITIES.has(key)) return;
+  if (_venues.some((v) => v.city.toLowerCase() === key && !v.seed)) return;
+  try {
+    const res = await fetch(`/api/venues?city=${encodeURIComponent(city)}`);
+    if (!res.ok) return;
+    const data = (await res.json()) as { venues?: Venue[] };
+    if (data.venues && data.venues.length) {
+      _venues = [...data.venues, ..._venues];
+      emit();
+    }
+  } catch {
+    /* network/provider error — falls back to the generic template */
+  }
+}
+
 // ── Admin writes ──────────────────────────────────────────────────────────────
 export interface VenueDraft {
   city: string;

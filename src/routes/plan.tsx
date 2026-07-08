@@ -1,7 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/datedata/store";
-import { useDatePlanStore, venuesForCity, submitReview } from "@/lib/dateplan/store";
+import {
+  useDatePlanStore,
+  venuesForCity,
+  ensureCityVenues,
+  submitReview,
+} from "@/lib/dateplan/store";
 import { buildPlan } from "@/lib/dateplan/engine";
 import { nameSignal } from "@/lib/dateplan/nameStats";
 import { getWeather } from "@/lib/dateplan/weather";
@@ -163,6 +168,9 @@ function PlanPage() {
       }
     }
     const weather = await getWeather(c.lat, c.lon, date, tod).catch(() => null);
+    // Auto-import venues for supported cities (e.g. Berlin) on first use; no-op
+    // for curated/other cities.
+    await ensureCityVenues(city);
     // Only that city's venues — never fall back to another city's places.
     const cityVenues = venuesForCity(city);
     setPlan(buildPlan(input, cityVenues, signal, weather, nonce));
