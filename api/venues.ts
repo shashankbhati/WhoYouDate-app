@@ -74,10 +74,13 @@ async function fetchKind(
   key: string,
 ): Promise<KindResult> {
   // New Foursquare Places API (the old api.foursquare.com/v3 was retired May 2026).
+  // Only free/core fields — `rating` and `price` are Premium and require paid
+  // credits (they 429 the whole call on the free tier). We keep parsing them in
+  // case billing is enabled later, but don't request them by default.
   const url =
     `https://places-api.foursquare.com/places/search?near=${encodeURIComponent(near)}` +
     `&query=${encodeURIComponent(q.query)}&limit=10` +
-    `&fields=${encodeURIComponent("name,rating,price,location,geocodes")}`;
+    `&fields=${encodeURIComponent("name,location,geocodes")}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${key}`,
