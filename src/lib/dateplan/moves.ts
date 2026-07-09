@@ -2,10 +2,12 @@ import type { Move } from "./types";
 
 // ── The moves bank ────────────────────────────────────────────────────────────
 // Hand-tagged risk/reward for launch. Once plan_reviews has volume, these labels
-// get replaced by REAL success rates from outcomes (see engine + store).
+// get replaced by REAL success rates from outcomes.
 //
-// Tone rule: every move is something the USER proposes about their OWN plan —
-// never a tactic to pressure the other person. Hints stay read-the-room / consent-positive.
+// Rewards are deliberately varied so the tradeoff means something: most low-risk
+// moves are small/steady, and only a few earn a "big payoff". Tone rule: every
+// move is something the USER proposes about their OWN plan — never a tactic to
+// pressure the other person; hints stay read-the-room / consent-positive.
 
 export const MOVES: Move[] = [
   // ── Low risk ────────────────────────────────────────────────
@@ -13,7 +15,7 @@ export const MOVES: Move[] = [
     id: "second_date",
     label: "Lock in a second date before you split",
     risk: "low",
-    reward: "high",
+    reward: "high", // the signature low-risk / high-reward move
     stage: "late",
     times: ["morning", "afternoon", "evening", "night"],
     hint: "If it went well, naming a concrete next plan is the highest-return low-risk move there is.",
@@ -22,7 +24,7 @@ export const MOVES: Move[] = [
     id: "walk_more",
     label: "Suggest one more short walk instead of ending it",
     risk: "low",
-    reward: "med",
+    reward: "low",
     stage: "mid",
     times: ["morning", "afternoon", "evening"],
     hint: "Buys more time together with zero pressure.",
@@ -31,7 +33,7 @@ export const MOVES: Move[] = [
     id: "dessert",
     label: "Grab dessert or an ice cream nearby",
     risk: "low",
-    reward: "med",
+    reward: "low",
     stage: "mid",
     times: ["afternoon", "evening", "night"],
     hint: "Light, sweet, easy — extends the date without raising the stakes.",
@@ -51,7 +53,7 @@ export const MOVES: Move[] = [
     id: "billiards",
     label: "Go for billiards or a bar game",
     risk: "med",
-    reward: "high",
+    reward: "med",
     stage: "mid",
     times: ["afternoon", "evening", "night"],
     hint: "A shared activity kills awkward silences and creates playful contact.",
@@ -69,7 +71,7 @@ export const MOVES: Move[] = [
     id: "cook_class_museum",
     label: "Do something with your hands — a gallery, market, or tasting",
     risk: "med",
-    reward: "med",
+    reward: "low",
     stage: "mid",
     times: ["morning", "afternoon"],
     hint: "Gives you both something to react to and talk about.",
@@ -98,7 +100,7 @@ export const MOVES: Move[] = [
     id: "nightcap",
     label: "Suggest one last drink somewhere with a view",
     risk: "high",
-    reward: "high",
+    reward: "med",
     stage: "late",
     times: ["evening", "night"],
     hint: "Signals real interest without going all-in. Have a graceful exit ready either way.",
@@ -107,7 +109,7 @@ export const MOVES: Move[] = [
     id: "spontaneous_plan",
     label: "Ditch the plan and improvise something they mentioned wanting to do",
     risk: "high",
-    reward: "high",
+    reward: "med",
     stage: "mid",
     times: ["morning", "afternoon", "evening"],
     hint: "Memorable if you listened well; falls flat if you're guessing.",

@@ -1,21 +1,25 @@
-import type { TimeOfDay, VenueKind, Stage, Venue } from "./types";
+import type { TimeOfDay, VenueKind, Stage, Budget, Venue } from "./types";
 
-// ── Roadmap templates ─────────────────────────────────────────────────────────
-// A template is an ordered list of steps for a given time of day. "stop" steps
-// either embed a fixed local scene (walks past real landmarks — no venue needed)
-// or declare a venue `slot` the engine fills from the curated `venues` table.
-// "decision" steps are where the engine offers the low/med/high move spread.
+// ── Roadmap arcs ──────────────────────────────────────────────────────────────
+// An arc is the ORDERED, FULL set of stops for a date (a real date's shape:
+// opener → main → wind-down). The engine truncates it to a realistic stop count
+// by duration, distributes the minutes, and inserts the decision points — so
+// templates here are just stops, never decisions or filler.
+//
+// Budget shapes the arc itself (a cheap date is coffee+walk+dessert, not an
+// expensive date with smaller numbers). Dresden is hand-authored with real
+// landmarks; every other city uses the generic budget-aware arc.
 
 export interface StopSpec {
   kind: "stop";
   emoji: string;
-  minutes: number;
-  slot?: VenueKind; // if set, engine fills from a curated venue of this kind
-  title: string; // used when there's no venue (or as prefix)
-  scene: string; // sentence; "{venue}" is replaced with the picked venue name
+  minutes: number; // base duration; the engine scales it to fit the total
+  slot?: VenueKind; // if set, filled from a venue of this kind (else fixed scene)
+  title: string;
+  scene: string; // "{venue}" is replaced with the picked venue name
   questionStage: Stage;
-  outdoor?: boolean; // weather-sensitive
-  indoorSwap?: string; // alternate scene when weather is bad
+  outdoor?: boolean;
+  indoorSwap?: string;
 }
 
 export interface DecisionSpec {
@@ -25,9 +29,8 @@ export interface DecisionSpec {
 
 export type StepSpec = StopSpec | DecisionSpec;
 
-// City templates. Dresden is hand-authored; other cities fall back to a generic
-// skeleton (landmarks become generic "a scenic spot nearby").
-const DRESDEN: Record<TimeOfDay, StepSpec[]> = {
+// ── Dresden (hand-authored, real landmarks; core-first so short dates truncate well) ──
+const DRESDEN: Record<TimeOfDay, StopSpec[]> = {
   morning: [
     {
       kind: "stop",
@@ -41,15 +44,13 @@ const DRESDEN: Record<TimeOfDay, StepSpec[]> = {
     {
       kind: "stop",
       emoji: "🌅",
-      minutes: 25,
+      minutes: 30,
       title: "Walk the Elbe",
       scene: "Stroll the Brühlsche Terrasse — the 'Balcony of Europe' — with the Elbe below you.",
-      questionStage: "opener",
+      questionStage: "mid",
       outdoor: true,
-      indoorSwap:
-        "Wander the Zwinger's covered galleries and courtyard instead — dry and just as pretty.",
+      indoorSwap: "Wander the Zwinger's covered galleries instead — dry and just as pretty.",
     },
-    { kind: "decision", stage: "mid" },
     {
       kind: "stop",
       emoji: "🍰",
@@ -57,9 +58,8 @@ const DRESDEN: Record<TimeOfDay, StepSpec[]> = {
       slot: "dessert",
       title: "Sweet refuel",
       scene: "Refuel with something sweet at {venue}.",
-      questionStage: "mid",
+      questionStage: "late",
     },
-    { kind: "decision", stage: "late" },
   ],
   afternoon: [
     {
@@ -74,7 +74,7 @@ const DRESDEN: Record<TimeOfDay, StepSpec[]> = {
     {
       kind: "stop",
       emoji: "🏛️",
-      minutes: 30,
+      minutes: 35,
       title: "Altstadt wander",
       scene: "Wander the Altmarkt past the Frauenkirche and through the old town squares.",
       questionStage: "mid",
@@ -84,29 +84,27 @@ const DRESDEN: Record<TimeOfDay, StepSpec[]> = {
     {
       kind: "stop",
       emoji: "🍦",
-      minutes: 20,
+      minutes: 25,
       slot: "dessert",
       title: "Ice cream stop",
       scene: "Grab an ice cream at {venue} and keep walking.",
       questionStage: "mid",
     },
-    { kind: "decision", stage: "mid" },
     {
       kind: "stop",
       emoji: "🎨",
-      minutes: 40,
+      minutes: 45,
       slot: "activity",
       title: "Do something together",
       scene: "Do something with your hands together at {venue}.",
-      questionStage: "mid",
+      questionStage: "late",
     },
-    { kind: "decision", stage: "late" },
   ],
   evening: [
     {
       kind: "stop",
       emoji: "🍸",
-      minutes: 60,
+      minutes: 55,
       slot: "bar",
       title: "Drinks to open the night",
       scene: "Open the evening with drinks at {venue} — relaxed, low-key.",
@@ -114,29 +112,28 @@ const DRESDEN: Record<TimeOfDay, StepSpec[]> = {
     },
     {
       kind: "stop",
-      emoji: "🌆",
-      minutes: 25,
-      title: "Sunset by the river",
-      scene:
-        "Walk down to the Elbwiesen (the river meadows) and catch the sunset over the old town skyline.",
-      questionStage: "mid",
-      outdoor: true,
-      indoorSwap: "Skip the riverside and settle into a cozy Neustadt spot as the light fades.",
-    },
-    {
-      kind: "stop",
       emoji: "🍽️",
-      minutes: 60,
+      minutes: 75,
       slot: "restaurant",
       title: "Dinner",
       scene: "Sit down for dinner at {venue}.",
       questionStage: "mid",
     },
-    { kind: "decision", stage: "late" },
+    {
+      kind: "stop",
+      emoji: "🌆",
+      minutes: 30,
+      title: "Sunset by the river",
+      scene:
+        "Walk down to the Elbwiesen (the river meadows) and catch the last light over the old town skyline.",
+      questionStage: "late",
+      outdoor: true,
+      indoorSwap: "Skip the riverside and settle into a cozy Neustadt spot as the light fades.",
+    },
     {
       kind: "stop",
       emoji: "🍨",
-      minutes: 25,
+      minutes: 30,
       slot: "dessert",
       title: "Nightcap or dessert",
       scene: "Wind down with dessert or a last drink at {venue}.",
@@ -147,7 +144,7 @@ const DRESDEN: Record<TimeOfDay, StepSpec[]> = {
     {
       kind: "stop",
       emoji: "🍸",
-      minutes: 50,
+      minutes: 55,
       slot: "bar",
       title: "Meet for a drink",
       scene: "Meet for a drink at {venue} in the Neustadt — the nightlife quarter.",
@@ -156,7 +153,7 @@ const DRESDEN: Record<TimeOfDay, StepSpec[]> = {
     {
       kind: "stop",
       emoji: "🎱",
-      minutes: 45,
+      minutes: 50,
       slot: "activity",
       title: "Play something",
       scene: "Break the ice with a game at {venue}.",
@@ -165,7 +162,7 @@ const DRESDEN: Record<TimeOfDay, StepSpec[]> = {
     {
       kind: "stop",
       emoji: "🌙",
-      minutes: 20,
+      minutes: 25,
       title: "Night walk",
       scene:
         "Take a slow walk through the Kunsthofpassage courtyards — the lit-up art yards are pure Dresden.",
@@ -173,200 +170,114 @@ const DRESDEN: Record<TimeOfDay, StepSpec[]> = {
       outdoor: true,
       indoorSwap: "Find a warm corner bar and let the night wind down there.",
     },
-    { kind: "decision", stage: "late" },
   ],
 };
 
-const GENERIC: Record<TimeOfDay, StepSpec[]> = {
-  morning: [
-    {
-      kind: "stop",
-      emoji: "☕",
-      minutes: 45,
-      slot: "cafe",
-      title: "Slow coffee",
-      scene: "Start easy over coffee at {venue}.",
-      questionStage: "opener",
-    },
-    {
-      kind: "stop",
-      emoji: "🌳",
-      minutes: 25,
-      slot: "park",
-      title: "Morning walk",
-      scene: "Take a morning walk through {venue} to warm up the conversation.",
-      questionStage: "opener",
-      outdoor: true,
-      indoorSwap: "Find an indoor spot — a market hall or gallery — if the weather's off.",
-    },
-    { kind: "decision", stage: "mid" },
-    {
-      kind: "stop",
-      emoji: "🍰",
-      minutes: 30,
-      slot: "dessert",
-      title: "Sweet refuel",
-      scene: "Refuel with something sweet at {venue}.",
-      questionStage: "mid",
-    },
-    { kind: "decision", stage: "late" },
+// ── Generic (budget-aware) stop factories ─────────────────────────────────────
+const cafe = (scene: string, q: Stage = "opener"): StopSpec => ({
+  kind: "stop",
+  emoji: "☕",
+  minutes: 45,
+  slot: "cafe",
+  title: "Coffee",
+  scene,
+  questionStage: q,
+});
+const bar = (scene: string): StopSpec => ({
+  kind: "stop",
+  emoji: "🍸",
+  minutes: 55,
+  slot: "bar",
+  title: "Drinks",
+  scene,
+  questionStage: "opener",
+});
+const restaurant = (): StopSpec => ({
+  kind: "stop",
+  emoji: "🍽️",
+  minutes: 75,
+  slot: "restaurant",
+  title: "Dinner",
+  scene: "Sit down for dinner at {venue}.",
+  questionStage: "mid",
+});
+const dessert = (): StopSpec => ({
+  kind: "stop",
+  emoji: "🍨",
+  minutes: 25,
+  slot: "dessert",
+  title: "Something sweet",
+  scene: "Grab something sweet at {venue}.",
+  questionStage: "late",
+});
+const activity = (): StopSpec => ({
+  kind: "stop",
+  emoji: "🎳",
+  minutes: 55,
+  slot: "activity",
+  title: "Do something together",
+  scene: "Break things up with something hands-on at {venue}.",
+  questionStage: "mid",
+});
+const walk = (label: string, q: Stage = "mid"): StopSpec => ({
+  kind: "stop",
+  emoji: "🌳",
+  minutes: 30,
+  slot: "park",
+  title: `${label} walk`,
+  scene: `Take a ${label.toLowerCase()} stroll through {venue}.`,
+  questionStage: q,
+  outdoor: true,
+  indoorSwap: "Duck somewhere cosy and keep talking if the weather turns.",
+});
+
+const GENERIC: Record<TimeOfDay, (b: Budget) => StopSpec[]> = {
+  morning: () => [cafe("Start easy over coffee at {venue}."), walk("Morning", "opener"), dessert()],
+  afternoon: (b) => [
+    cafe("Meet over coffee at {venue}."),
+    walk("Afternoon"),
+    b === "treat" ? activity() : dessert(),
   ],
-  afternoon: [
-    {
-      kind: "stop",
-      emoji: "☕",
-      minutes: 40,
-      slot: "cafe",
-      title: "Coffee",
-      scene: "Meet over coffee at {venue}.",
-      questionStage: "opener",
-    },
-    {
-      kind: "stop",
-      emoji: "🌳",
-      minutes: 30,
-      slot: "park",
-      title: "Afternoon stroll",
-      scene: "Wander through {venue} together.",
-      questionStage: "mid",
-      outdoor: true,
-      indoorSwap: "Head into an arcade or museum if it rains.",
-    },
-    {
-      kind: "stop",
-      emoji: "🍦",
-      minutes: 20,
-      slot: "dessert",
-      title: "Ice cream",
-      scene: "Grab an ice cream at {venue}.",
-      questionStage: "mid",
-    },
-    { kind: "decision", stage: "mid" },
-    { kind: "decision", stage: "late" },
-  ],
-  evening: [
-    {
-      kind: "stop",
-      emoji: "🍸",
-      minutes: 60,
-      slot: "bar",
-      title: "Drinks",
-      scene: "Open the evening with drinks at {venue}.",
-      questionStage: "opener",
-    },
-    {
-      kind: "stop",
-      emoji: "🌆",
-      minutes: 25,
-      slot: "park",
-      title: "Golden-hour walk",
-      scene: "Take a golden-hour stroll through {venue}.",
-      questionStage: "mid",
-      outdoor: true,
-      indoorSwap: "Settle into a cozy spot as the light fades.",
-    },
-    {
-      kind: "stop",
-      emoji: "🍽️",
-      minutes: 60,
-      slot: "restaurant",
-      title: "Dinner",
-      scene: "Sit down for dinner at {venue}.",
-      questionStage: "mid",
-    },
-    { kind: "decision", stage: "late" },
-  ],
-  night: [
-    {
-      kind: "stop",
-      emoji: "🍸",
-      minutes: 50,
-      slot: "bar",
-      title: "Meet for a drink",
-      scene: "Meet for a drink at {venue}.",
-      questionStage: "opener",
-    },
-    {
-      kind: "stop",
-      emoji: "🎱",
-      minutes: 45,
-      slot: "activity",
-      title: "Play something",
-      scene: "Break the ice with a game at {venue}.",
-      questionStage: "mid",
-    },
-    { kind: "decision", stage: "late" },
-  ],
+  evening: (b) =>
+    b === "tight"
+      ? [bar("Open the evening with drinks at {venue}."), walk("Golden-hour"), dessert()]
+      : b === "comfortable"
+        ? [
+            bar("Open the evening with drinks at {venue}."),
+            restaurant(),
+            walk("After-dinner", "late"),
+          ]
+        : [
+            bar("Open the evening with drinks at {venue}."),
+            restaurant(),
+            walk("After-dinner", "late"),
+            dessert(),
+          ],
+  night: (b) =>
+    b === "tight"
+      ? [bar("Meet for a drink at {venue}."), walk("Late-night", "late")]
+      : b === "comfortable"
+        ? [bar("Meet for a drink at {venue}."), activity(), walk("Late-night", "late")]
+        : [bar("Meet for a drink at {venue}."), activity(), walk("Late-night", "late"), dessert()],
 };
 
-const CITY_TEMPLATES: Record<string, Record<TimeOfDay, StepSpec[]>> = {
-  dresden: DRESDEN,
-};
+const CITY_TEMPLATES: Record<string, Record<TimeOfDay, StopSpec[]>> = { dresden: DRESDEN };
 
-export function templateFor(city: string, timeOfDay: TimeOfDay): StepSpec[] {
+// The full arc for a city+time+budget (before the engine truncates to a
+// realistic stop count). Dresden ignores budget (its scenes are the showcase).
+export function arcFor(city: string, timeOfDay: TimeOfDay, budget: Budget): StopSpec[] {
   const key = city.trim().toLowerCase();
-  return (CITY_TEMPLATES[key] ?? GENERIC)[timeOfDay];
+  const curated = CITY_TEMPLATES[key];
+  return curated ? curated[timeOfDay] : GENERIC[timeOfDay](budget);
 }
 
 export function hasCuratedTemplate(city: string): boolean {
   return city.trim().toLowerCase() in CITY_TEMPLATES;
 }
 
-// Extra stops the engine appends (cycling) to stretch a plan toward a longer
-// target duration — e.g. a whole-day date. Kept generic so they work anywhere.
-export const FILLERS: StopSpec[] = [
-  {
-    kind: "stop",
-    emoji: "☕",
-    minutes: 30,
-    slot: "cafe",
-    title: "Coffee refuel",
-    scene: "Refuel with a coffee at {venue} and let the conversation breathe.",
-    questionStage: "mid",
-  },
-  {
-    kind: "stop",
-    emoji: "🚶",
-    minutes: 25,
-    title: "Wander a bit more",
-    scene: "Take a slow wander with no particular destination.",
-    questionStage: "mid",
-    outdoor: true,
-    indoorSwap: "Duck somewhere cosy and keep talking.",
-  },
-  {
-    kind: "stop",
-    emoji: "🎲",
-    minutes: 45,
-    slot: "activity",
-    title: "Do something together",
-    scene: "Break things up with something hands-on at {venue}.",
-    questionStage: "mid",
-  },
-  {
-    kind: "stop",
-    emoji: "🍨",
-    minutes: 20,
-    slot: "dessert",
-    title: "Something sweet",
-    scene: "Grab something sweet at {venue}.",
-    questionStage: "late",
-  },
-  {
-    kind: "stop",
-    emoji: "🍹",
-    minutes: 40,
-    slot: "bar",
-    title: "One more drink",
-    scene: "Keep the evening going with a drink at {venue}.",
-    questionStage: "late",
-  },
-];
-
 // ── Starter venues ────────────────────────────────────────────────────────────
-// Shown instantly so the planner is never blank (same philosophy as the app's
-// seeded ledger). These are STARTER EXAMPLES — the owner replaces/verifies them
-// in /plan-admin. `rating` is an editorial "our pick" score, not a Google rating.
+// Shown instantly so the planner is never blank. STARTER EXAMPLES — replaced/
+// verified in /plan-admin. `rating` is an editorial "our pick" score.
 export function seedDresdenVenues(): Venue[] {
   const v = (
     name: string,
@@ -392,6 +303,7 @@ export function seedDresdenVenues(): Venue[] {
   });
 
   return [
+    // Budget (tier 1–2)
     v(
       "Combo Coffee",
       "cafe",
@@ -452,7 +364,7 @@ export function seedDresdenVenues(): Venue[] {
       ["playful", "games"],
       "Pool tables — the classic ice-breaker move.",
     ),
-    // ── Comfortable (tier 3) ──
+    // Comfortable (tier 3)
     v(
       "Kaffeehaus Aha",
       "cafe",
@@ -483,7 +395,7 @@ export function seedDresdenVenues(): Venue[] {
       ["romantic", "cocktails"],
       "Grown-up cocktail bar — good for a real conversation.",
     ),
-    // ── Treat (tier 4) ──
+    // Treat (tier 4)
     v(
       "Kastenmeiers",
       "restaurant",

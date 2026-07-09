@@ -1,39 +1,38 @@
 import type { Budget, VenueKind } from "./types";
 
 // ── Cost model ────────────────────────────────────────────────────────────────
-// The displayed cost is anchored to the BUDGET as a spend-rate per hour, then
-// split across the paid stops. This guarantees:
-//   • total scales with the duration slider (more hours → more money),
-//   • budgets are clearly separated (cheap ≪ comfortable ≪ treat),
-//   • per-stop costs always add up to the total (no odd inversions).
+// Each activity type has a realistic per-person cost that scales by budget tier.
+// The plan's total is simply the SUM of its stops — so it emerges honestly
+// (dinner costs more than coffee, bowling is never €6), and because budget also
+// shapes WHICH activities appear (see templates), a cheap plan is genuinely cheap.
 
-// Free stops — a walk by the river costs nothing.
 const FREE_KINDS: VenueKind[] = ["walk", "park", "view"];
 export function isFreeKind(kind: VenueKind): boolean {
   return FREE_KINDS.includes(kind);
 }
 
-// Rough FX vs EUR (not live rates — just to keep the number sensible per market).
-const CCY_MULT: Record<string, number> = {
-  EUR: 1,
-  USD: 1.1,
-  GBP: 0.85,
-  CHF: 1,
-  INR: 35,
+// Typical per-person cost in EUR, by activity and budget.
+const COST_EUR: Record<string, Record<Budget, number>> = {
+  cafe: { tight: 5, comfortable: 7, treat: 10 },
+  bar: { tight: 9, comfortable: 14, treat: 22 },
+  restaurant: { tight: 16, comfortable: 30, treat: 58 },
+  dessert: { tight: 5, comfortable: 8, treat: 13 },
+  activity: { tight: 12, comfortable: 17, treat: 27 },
 };
 
-// Spend rate per hour, in EUR cents. Tuned so "cheap" ≈ €20 for ~3.5h and ≈ €35
-// for a half day, with comfortable/treat clearly above it.
-const BUDGET_EUR_PER_HOUR_CENTS: Record<Budget, number> = {
-  tight: 600, // ~€6/hr  → 3.5h ≈ €21, 6h ≈ €36
-  comfortable: 1300, // ~€13/hr → 3h ≈ €39
-  treat: 2600, // ~€26/hr → 3h ≈ €78
-};
+// Rough FX vs EUR (not live) — keeps the number sensible per market.
+const CCY_MULT: Record<string, number> = { EUR: 1, USD: 1.1, GBP: 0.85, CHF: 1, INR: 35 };
 
-export function budgetTotalCents(budget: Budget, hours: number, currency: string): number {
-  const base = BUDGET_EUR_PER_HOUR_CENTS[budget] * hours;
+// Per-stop cost in cents. Free kinds (a walk) cost nothing.
+export function stopCostCents(
+  kind: VenueKind | undefined,
+  budget: Budget,
+  currency: string,
+): number {
+  if (!kind || isFreeKind(kind)) return 0;
+  const eur = COST_EUR[kind]?.[budget] ?? 0;
   const mult = CCY_MULT[currency] ?? 1;
-  return Math.round((base * mult) / 100) * 100; // whole currency units
+  return Math.round(eur * mult) * 100;
 }
 
 export function currencySymbol(currency: string): string {
