@@ -155,7 +155,7 @@ function weatherBannerFor(w: WeatherHint, timeOfDay: PlanInput["timeOfDay"]): st
     case "wet":
       return `${w.emoji} ${w.summary} — rain about, so the outdoor legs are swapped for indoor backups.`;
     default:
-      return `${w.emoji} ${w.summary} — a lovely ${timeOfDay} to be outside; the plan makes the most of the walk.`;
+      return `${w.emoji} ${w.summary} — good weather for the outdoor parts of this date.`;
   }
 }
 

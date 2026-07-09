@@ -340,7 +340,13 @@ function PlanPage() {
 
       {!hasCuratedTemplate(city) && (
         <p className="mt-3 text-xs text-muted-foreground text-center">
-          Dresden is fully curated. Other cities use a general roadmap for now — more cities coming.
+          More cities are being added.{" "}
+          <a
+            href="mailto:hello@whoamidating.singles?subject=Add my city"
+            className="text-primary hover:underline"
+          >
+            Request yours →
+          </a>
         </p>
       )}
 
