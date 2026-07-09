@@ -8,6 +8,8 @@ import {
   submitReview,
 } from "@/lib/dateplan/store";
 import { buildPlan } from "@/lib/dateplan/engine";
+import { sharePlan } from "@/lib/dateplan/share";
+import { openAuthModal } from "@/lib/auth";
 import { nameSignal } from "@/lib/dateplan/nameStats";
 import { getWeather } from "@/lib/dateplan/weather";
 import { hasCuratedTemplate } from "@/lib/dateplan/templates";
@@ -397,8 +399,38 @@ function PlanView({
   };
 }) {
   const [chosen, setChosen] = useState<Record<number, Move>>({});
+  const [sharing, setSharing] = useState(false);
   const totalMin = plan.steps.reduce((a, s) => a + (s.type === "stop" ? s.minutes : 0), 0);
   const hrs = Math.round((totalMin / 60) * 10) / 10;
+
+  async function share(p: DatePlan) {
+    if (sharing) return;
+    setSharing(true);
+    const res = await sharePlan(p);
+    setSharing(false);
+    if (res.error === "login") return openAuthModal("Sign in to share this plan with your date.");
+    if (!res.ok || !res.url) return toast.error(res.error ?? "Couldn't create a share link.");
+    const data = {
+      title: "Our date plan",
+      text: "I planned our date 👀 — take a look (and tweak anything):",
+      url: res.url,
+    };
+    // Native share sheet (WhatsApp etc.) on mobile; clipboard fallback elsewhere.
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share(data);
+      } catch {
+        /* user cancelled */
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(res.url);
+        toast.success("Share link copied — send it to your date 💌");
+      } catch {
+        toast.message(res.url);
+      }
+    }
+  }
 
   return (
     <section className="mt-8">
@@ -537,13 +569,25 @@ function PlanView({
         )}
       </ol>
 
-      <button
-        onClick={onAnother}
-        disabled={building}
-        className="mt-6 w-full rounded-full border border-primary text-primary py-2.5 font-semibold hover:bg-primary/10 transition disabled:opacity-60"
-      >
-        {building ? "Shuffling…" : "🔄 Try another plan"}
-      </button>
+      <div className="mt-6 grid sm:grid-cols-2 gap-3">
+        <button
+          onClick={onAnother}
+          disabled={building}
+          className="w-full rounded-full border border-primary text-primary py-2.5 font-semibold hover:bg-primary/10 transition disabled:opacity-60"
+        >
+          {building ? "Shuffling…" : "🔄 Try another plan"}
+        </button>
+        <button
+          onClick={() => share(plan)}
+          disabled={sharing}
+          className="w-full rounded-full bg-primary text-primary-foreground py-2.5 font-semibold hover:opacity-90 transition disabled:opacity-60"
+        >
+          {sharing ? "Preparing…" : "📤 Share with your date"}
+        </button>
+      </div>
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        They'll see the plan (and can tweak it) — but never your budget, questions, or moves.
+      </p>
 
       <ReviewCard input={input} chosen={chosen} />
 
