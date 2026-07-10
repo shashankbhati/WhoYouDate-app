@@ -373,6 +373,7 @@ function PlanPage() {
           onAnother={() => build(variant.current + 1)}
           building={building}
           input={{ partnerName: name, city, date, timeOfDay: tod, ageRange: age }}
+          shareKey={`${name}|${city}|${date}|${tod}|${age}|${budget}|${durationHours}|${variant.current}`}
         />
       )}
     </main>
@@ -385,6 +386,7 @@ function PlanView({
   onAnother,
   building,
   input,
+  shareKey,
 }: {
   plan: DatePlan;
   proof: { count: number; secondPct: number } | null;
@@ -397,6 +399,7 @@ function PlanView({
     timeOfDay: TimeOfDay;
     ageRange: AgeRange;
   };
+  shareKey: string;
 }) {
   const [chosen, setChosen] = useState<Record<number, Move>>({});
   const [sharing, setSharing] = useState(false);
@@ -406,7 +409,7 @@ function PlanView({
   async function share(p: DatePlan) {
     if (sharing) return;
     setSharing(true);
-    const res = await sharePlan(p);
+    const res = await sharePlan(p, shareKey);
     setSharing(false);
     if (res.error === "login") return openAuthModal("Sign in to share this plan with your date.");
     if (!res.ok || !res.url) return toast.error(res.error ?? "Couldn't create a share link.");

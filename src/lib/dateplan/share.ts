@@ -54,20 +54,47 @@ function sanitize(plan: DatePlan): SharedStep[] {
     }));
 }
 
-// Create a shareable link. Requires a real (non-anonymous) login.
+// A stable short id from a string — same input always yields the same id, so
+// re-sharing the same plan reuses the same link instead of minting new ones.
+function stableId(s: string): string {
+  let h1 = 2166136261;
+  let h2 = 5381;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    h1 ^= c;
+    h1 = Math.imul(h1, 16777619);
+    h2 = (Math.imul(h2, 33) ^ c) >>> 0;
+  }
+  return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+}
+
+// Create (or reuse) a shareable link for a plan. Idempotent: the same plan maps
+// to the same link, and clicking Share again just returns it — no duplicate rows,
+// and any edits the recipient made are preserved. `planKey` identifies the plan
+// (its inputs + variant). Requires a real (non-anonymous) login.
 export async function sharePlan(
   plan: DatePlan,
-): Promise<{ ok: boolean; url?: string; error?: string }> {
+  planKey: string,
+): Promise<{ ok: boolean; url?: string; error?: string; reused?: boolean }> {
   if (typeof window === "undefined") return { ok: false };
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user?.email) return { ok: false, error: "login" };
 
+  const id = stableId(`${user.id}|${planKey}`);
+  const url = `${window.location.origin}/p/${id}`;
+
+  // Already shared this exact plan → hand back the same link untouched.
+  const { data: existing } = await supabase
+    .from("shared_plans")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  if (existing) return { ok: true, url, reused: true };
+
   const ownerName =
     (user.user_metadata?.full_name || user.user_metadata?.name || "").toString().trim() || null;
-  const id = crypto.randomUUID().replace(/-/g, "").slice(0, 10);
-
   const { error } = await supabase.from("shared_plans").insert({
     id,
     owner_id: user.id,
@@ -77,12 +104,14 @@ export async function sharePlan(
     steps: sanitize(plan),
   });
   if (error) {
+    // A concurrent double-click may race to the same id — treat as reuse.
+    if ((error as { code?: string }).code === "23505") return { ok: true, url, reused: true };
     const msg = /does not exist|schema cache/i.test(error.message)
       ? "shared_plans table not found — run migration_shared_plans.sql in Supabase."
       : error.message;
     return { ok: false, error: msg };
   }
-  return { ok: true, url: `${window.location.origin}/p/${id}` };
+  return { ok: true, url, reused: false };
 }
 
 export async function loadSharedPlan(id: string): Promise<SharedPlan | null> {
