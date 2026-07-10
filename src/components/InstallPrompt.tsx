@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 
-// A dismissible "add to home screen" banner shown on mobile.
-//   • Android/Chromium: captures the native install prompt → one-tap install.
-//   • iOS/Safari: Apple blocks programmatic install, so we show the manual hint.
+// A dismissible "add to home screen" banner.
+//   • Chrome/Edge (Android + desktop): captures the native install prompt → one-tap install.
+//   • iOS/Safari: Apple blocks programmatic install → show the manual Share hint.
+//   • Android without a captured prompt: show the menu hint so it's never a dead end.
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -11,37 +12,48 @@ interface BeforeInstallPromptEvent extends Event {
 
 const DISMISS_KEY = "wad_pwa_dismissed";
 
+// Capture the install event as early as the module loads — Chrome often fires it
+// before React mounts, so listening only inside a component's effect misses it.
+let deferredPrompt: BeforeInstallPromptEvent | null = null;
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e as BeforeInstallPromptEvent;
+    window.dispatchEvent(new Event("wad:installable"));
+  });
+}
+
 export function InstallPrompt() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [show, setShow] = useState(false);
-  const [ios, setIos] = useState(false);
+  const [os, setOs] = useState<"ios" | "android" | "other">("other");
+  const [hasPrompt, setHasPrompt] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const nav = window.navigator as Navigator & { standalone?: boolean };
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true;
-    if (standalone) return; // already installed
-    if (localStorage.getItem(DISMISS_KEY)) return; // user said no before
+    if (window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true) return; // installed
+    if (localStorage.getItem(DISMISS_KEY)) return; // dismissed before
 
     const ua = navigator.userAgent;
-    const isMobile = /android|iphone|ipad|ipod/i.test(ua);
-    if (!isMobile) return;
+    const o = /iphone|ipad|ipod/i.test(ua) ? "ios" : /android/i.test(ua) ? "android" : "other";
+    setOs(o);
+    if (deferredPrompt) setHasPrompt(true);
 
-    if (/iphone|ipad|ipod/i.test(ua)) {
-      setIos(true);
-      const t = setTimeout(() => setShow(true), 2500); // let the page settle first
-      return () => clearTimeout(t);
-    }
-
-    // Android / Chromium — capture the install prompt and surface our button.
-    const onBIP = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
+    const onInstallable = () => {
+      setHasPrompt(true);
       setShow(true);
     };
-    window.addEventListener("beforeinstallprompt", onBIP);
-    return () => window.removeEventListener("beforeinstallprompt", onBIP);
+    window.addEventListener("wad:installable", onInstallable);
+
+    // Show after a moment: if we can prompt (any platform) or on any phone.
+    const t = setTimeout(() => {
+      if (deferredPrompt || o === "ios" || o === "android") setShow(true);
+    }, 2000);
+
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("wad:installable", onInstallable);
+    };
   }, []);
 
   function dismiss() {
@@ -54,10 +66,10 @@ export function InstallPrompt() {
   }
 
   async function install() {
-    if (!deferred) return;
-    await deferred.prompt();
-    await deferred.userChoice;
-    setDeferred(null);
+    if (!deferredPrompt) return;
+    await deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
     dismiss();
   }
 
@@ -71,18 +83,21 @@ export function InstallPrompt() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">Add to your home screen</p>
-          {ios ? (
+          {hasPrompt ? (
+            <p className="mt-0.5 text-xs text-white/70">Open it like a real app — one tap.</p>
+          ) : os === "ios" ? (
             <p className="mt-0.5 text-xs text-white/70">
-              For the full app experience: tap{" "}
-              <ShareIcon className="mx-0.5 inline size-3.5 -translate-y-px" /> then{" "}
+              Tap <ShareIcon className="mx-0.5 inline size-3.5 -translate-y-px" /> then{" "}
               <span className="font-semibold text-white">Add to Home Screen</span>.
             </p>
           ) : (
             <p className="mt-0.5 text-xs text-white/70">
-              Open it like a real app — full-screen, one tap away.
+              Open the browser menu{" "}
+              <span className="font-semibold text-white">⋮</span> then{" "}
+              <span className="font-semibold text-white">Install app</span> / Add to Home screen.
             </p>
           )}
-          {!ios && (
+          {hasPrompt && (
             <button
               onClick={install}
               className="mt-2.5 rounded-full bg-[color:var(--color-reel-rose,#f43f5e)] px-4 py-1.5 text-sm font-semibold text-neutral-950"
@@ -105,13 +120,7 @@ export function InstallPrompt() {
 
 function ShareIcon({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      className={className}
-    >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
       <path d="M12 3v13M12 3l-4 4M12 3l4 4" strokeLinecap="round" strokeLinejoin="round" />
       <path
         d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"
