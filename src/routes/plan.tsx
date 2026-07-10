@@ -98,6 +98,7 @@ function PlanPage() {
 
   const [plan, setPlan] = useState<DatePlan | null>(null);
   const [building, setBuilding] = useState(false);
+  const [mode, setMode] = useState<"setup" | "reel">("setup"); // setup card → full reel
   const variant = useRef(0);
   const geoCity = useRef(DRESDEN.name); // the city `coords` currently points at
 
@@ -175,6 +176,7 @@ function PlanPage() {
     // Only that city's venues — never fall back to another city's places.
     const cityVenues = venuesForCity(city);
     setPlan(buildPlan(input, cityVenues, signal, weather, nonce));
+    setMode("reel"); // hand over the screen to the reel
     setBuilding(false);
   }
 
@@ -189,8 +191,30 @@ function PlanPage() {
     return { count: rows.length, secondPct: Math.round(second * 100) };
   }, [entries, plan?.city]);
 
+  if (mode === "reel" && plan) {
+    return (
+      <main className="mx-auto max-w-[440px] px-4 py-8">
+        <button
+          type="button"
+          onClick={() => setMode("setup")}
+          className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          ← Edit details
+        </button>
+        <PlanView
+          plan={plan}
+          proof={cityProof}
+          onAnother={() => build(variant.current + 1)}
+          building={building}
+          input={{ partnerName: name, city, date, timeOfDay: tod, ageRange: age }}
+          shareKey={`${name}|${city}|${date}|${tod}|${age}|${budget}|${durationHours}|${variant.current}`}
+        />
+      </main>
+    );
+  }
+
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
+    <main className="mx-auto max-w-xl px-4 py-10">
       <h1 className="text-3xl font-bold">Plan the date</h1>
       <p className="text-muted-foreground mt-1">
         A full roadmap — where to go, what to ask, what it costs, and your next move rated by risk.
@@ -349,31 +373,6 @@ function PlanPage() {
             Request yours →
           </a>
         </p>
-      )}
-
-      {/* Empty state before the first plan — keeps the page from feeling blank. */}
-      {!plan && !building && (
-        <div className="mt-8 rounded-2xl border border-dashed border-border bg-card/50 p-8 text-center">
-          <p className="text-4xl">🗺️</p>
-          <p className="mt-3 font-semibold">Your date roadmap appears here</p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
-            Set the vibe above and tap{" "}
-            <span className="text-foreground font-medium">Plan a date</span> — you'll get where to
-            go, what to ask, what it costs, and your best moves.
-          </p>
-        </div>
-      )}
-
-      {/* ── The plan ── */}
-      {plan && (
-        <PlanView
-          plan={plan}
-          proof={cityProof}
-          onAnother={() => build(variant.current + 1)}
-          building={building}
-          input={{ partnerName: name, city, date, timeOfDay: tod, ageRange: age }}
-          shareKey={`${name}|${city}|${date}|${tod}|${age}|${budget}|${durationHours}|${variant.current}`}
-        />
       )}
     </main>
   );
