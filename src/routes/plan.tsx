@@ -17,7 +17,6 @@ import { fmtMoney } from "@/lib/dateplan/cost";
 import { getCountryConfig } from "@/lib/country";
 import {
   TIME_META,
-  BUDGET_META,
   type TimeOfDay,
   type AgeRange,
   type Budget,
@@ -44,6 +43,12 @@ export const Route = createFileRoute("/plan")({
 const TODS: TimeOfDay[] = ["morning", "afternoon", "evening", "night"];
 const AGES: AgeRange[] = ["18-24", "25-34", "35-44", "45+"];
 const BUDGETS: Budget[] = ["tight", "comfortable", "treat"];
+const BUDGET_SYM: Record<Budget, string> = { tight: "€", comfortable: "€€", treat: "€€€" };
+const LENGTHS: { label: string; h: number }[] = [
+  { label: "2h", h: 2 },
+  { label: "4h", h: 4 },
+  { label: "All night", h: 6 },
+];
 
 // Known coords for our launch city so weather works with zero clicks.
 const DRESDEN = { name: "Dresden", lat: 51.0504, lon: 13.7373 };
@@ -74,11 +79,6 @@ function cityNameFrom(r: NominatimResult): string {
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
-function durationLabel(h: number): string {
-  if (h >= 8) return "Whole day";
-  if (h >= 5) return "Half day";
-  return `${h} hr${h > 1 ? "s" : ""}`;
-}
 
 function PlanPage() {
   const { entries } = useStore();
@@ -94,7 +94,7 @@ function PlanPage() {
   const [tod, setTod] = useState<TimeOfDay>("evening");
   const [age, setAge] = useState<AgeRange>("25-34");
   const [budget, setBudget] = useState<Budget>("comfortable");
-  const [durationHours, setDurationHours] = useState(3);
+  const [durationHours, setDurationHours] = useState(4);
 
   const [plan, setPlan] = useState<DatePlan | null>(null);
   const [building, setBuilding] = useState(false);
@@ -214,153 +214,185 @@ function PlanPage() {
   }
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-3xl font-bold">Plan the date</h1>
-      <p className="text-muted-foreground mt-1">
-        A full roadmap — where to go, what to ask, what it costs, and your next move rated by risk.
-      </p>
+    <main className="mx-auto max-w-[440px] px-4 py-8 [font-family:var(--font-sans)]">
+      {/* Header */}
+      <div className="mb-4 px-1">
+        <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          New date · draft 01
+        </p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-balance">
+          Tell me the shape of it.
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">A few taps. I'll write the reel.</p>
+      </div>
 
-      {/* ── Inputs ── */}
+      {/* Cinematic setup card */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           build(0);
         }}
-        className="mt-6 rounded-2xl border border-border bg-card p-5 space-y-5"
+        className="relative overflow-hidden rounded-[32px] bg-[color:var(--color-reel-surface)] p-6 ring-1 ring-white/10 shadow-2xl"
       >
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-semibold block mb-2">
-              Your date's first name{" "}
-              <span className="text-muted-foreground font-normal">(optional)</span>
+        <div
+          className="pointer-events-none absolute inset-0 opacity-40"
+          style={{
+            background:
+              "radial-gradient(circle at 15% 0%, oklch(0.35 0.11 15 / 0.5), transparent 55%), radial-gradient(circle at 90% 100%, oklch(0.3 0.09 300 / 0.5), transparent 55%)",
+          }}
+        />
+        <div className="relative space-y-6 text-white">
+          {/* For + In */}
+          <div className="grid grid-cols-[1fr_auto] items-end gap-3">
+            <label className="block">
+              <span className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/40">
+                For
+              </span>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[color:var(--color-reel-rose-soft)] text-sm font-semibold text-[color:var(--color-reel-rose)]">
+                  {name.trim() ? name.trim()[0].toUpperCase() : "♥"}
+                </span>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="your date"
+                  className="w-full border-b border-white/15 bg-transparent pb-1 text-2xl font-semibold tracking-tight outline-none placeholder:text-white/30 focus:border-[color:var(--color-reel-rose)]"
+                />
+              </div>
             </label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Lena, Priya…"
-              className="w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40"
-            />
+            <div className="relative block text-right">
+              <span className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/40">
+                In
+              </span>
+              <input
+                value={city}
+                onChange={(e) => handleCityChange(e.target.value)}
+                onFocus={() => suggestions.length > 0 && setShowSug(true)}
+                onBlur={() => setTimeout(() => setShowSug(false), 200)}
+                className="mt-1 w-32 border-b border-white/15 bg-transparent pb-1 text-right text-lg outline-none focus:border-[color:var(--color-reel-rose)]"
+              />
+              {showSug && suggestions.length > 0 && (
+                <ul className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-xl bg-[color:var(--color-reel-bg)] ring-1 ring-white/10 shadow-xl">
+                  {suggestions.map((r) => (
+                    <li key={r.place_id}>
+                      <button
+                        type="button"
+                        onMouseDown={() => pickCity(r)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-white/[0.06] transition"
+                      >
+                        <div className="text-sm font-medium">{cityNameFrom(r)}</div>
+                        <div className="text-xs text-white/40 truncate">
+                          {[r.address.state, r.address.country].filter(Boolean).join(", ")}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
-          <div className="relative">
-            <label className="text-sm font-semibold block mb-2">City</label>
-            <input
-              value={city}
-              onChange={(e) => handleCityChange(e.target.value)}
-              onFocus={() => suggestions.length > 0 && setShowSug(true)}
-              onBlur={() => setTimeout(() => setShowSug(false), 200)}
-              placeholder="Search a city…"
-              className="w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40"
-            />
-            {showSug && suggestions.length > 0 && (
-              <ul className="absolute z-20 w-full mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden">
-                {suggestions.map((r) => (
-                  <li key={r.place_id}>
-                    <button
-                      type="button"
-                      onMouseDown={() => pickCity(r)}
-                      className="w-full text-left px-4 py-2.5 hover:bg-muted transition"
-                    >
-                      <div className="text-sm font-medium">{cityNameFrom(r)}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {[r.address.state, r.address.country].filter(Boolean).join(", ")}
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
 
-        <div>
-          <label className="text-sm font-semibold block mb-2">Time of day</label>
-          <div className="grid grid-cols-4 gap-2">
-            {TODS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTod(t)}
-                className={`rounded-xl border py-3 flex flex-col items-center gap-1 transition ${tod === t ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
-              >
-                <span className="text-xl">{TIME_META[t].emoji}</span>
-                <span className="text-xs font-medium">{TIME_META[t].label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-semibold block mb-2">Budget</label>
-          <div className="grid grid-cols-3 gap-2">
-            {BUDGETS.map((b) => (
-              <button
-                key={b}
-                type="button"
-                onClick={() => setBudget(b)}
-                className={`rounded-xl border py-3 flex flex-col items-center gap-1 transition ${budget === b ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
-              >
-                <span className="text-xl">{BUDGET_META[b].emoji}</span>
-                <span className="text-xs font-medium">{BUDGET_META[b].label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-semibold flex items-center justify-between mb-2">
-            <span>How long?</span>
-            <span className="text-primary font-bold">{durationLabel(durationHours)}</span>
-          </label>
-          <input
-            type="range"
-            min={1}
-            max={8}
-            step={1}
-            value={durationHours}
-            onChange={(e) => setDurationHours(+e.target.value)}
-            className="w-full accent-[var(--primary)]"
-          />
-          <div className="flex justify-between text-[11px] text-muted-foreground mt-1">
-            <span>Quick (1h)</span>
-            <span>Half day</span>
-            <span>Whole day</span>
-          </div>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
+          {/* Time of day */}
           <div>
-            <label className="text-sm font-semibold block mb-2">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-xl bg-input border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring/40"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-semibold block mb-2">Age range</label>
-            <div className="grid grid-cols-4 gap-1.5">
-              {AGES.map((a) => (
+            <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/40">
+              When
+            </p>
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {TODS.map((t) => (
                 <button
-                  key={a}
+                  key={t}
                   type="button"
-                  onClick={() => setAge(a)}
-                  className={`rounded-lg border py-2.5 text-xs font-semibold transition ${age === a ? "border-primary bg-primary/10 text-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}
+                  onClick={() => setTod(t)}
+                  className={`flex flex-col items-center gap-1 rounded-2xl border py-2.5 transition ${tod === t ? "border-[color:var(--color-reel-rose)] bg-[color:var(--color-reel-rose)]/15" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"}`}
                 >
-                  {a}
+                  <span className="text-lg leading-none">{TIME_META[t].emoji}</span>
+                  <span className="text-[11px] font-medium">{TIME_META[t].label}</span>
                 </button>
               ))}
             </div>
           </div>
-        </div>
 
-        <button
-          type="submit"
-          disabled={building}
-          className="w-full rounded-full bg-primary text-primary-foreground py-3 font-semibold hover:opacity-90 transition disabled:opacity-60"
-        >
-          {building ? "Planning…" : "Plan a date 🗺️"}
-        </button>
+          {/* Budget + Length pills */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/40">
+                Budget
+              </p>
+              <div className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[0.03] p-1">
+                {BUDGETS.map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => setBudget(b)}
+                    className={`min-w-10 rounded-full px-3 py-1.5 text-sm font-semibold transition ${budget === b ? "bg-white text-neutral-950" : "text-white/60"}`}
+                  >
+                    {BUDGET_SYM[b]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/40">
+                Length
+              </p>
+              <div className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[0.03] p-1">
+                {LENGTHS.map((l) => (
+                  <button
+                    key={l.label}
+                    type="button"
+                    onClick={() => setDurationHours(l.h)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${durationHours === l.h ? "bg-white text-neutral-950" : "text-white/60"}`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Date + Age */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/40">
+                Date
+              </p>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-2 w-full border-b border-white/15 bg-transparent pb-1 text-sm outline-none focus:border-[color:var(--color-reel-rose)] [color-scheme:dark]"
+              />
+            </div>
+            <div>
+              <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/40">
+                Age
+              </p>
+              <div className="mt-2 grid grid-cols-4 gap-1">
+                {AGES.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => setAge(a)}
+                    className={`rounded-lg border py-1.5 text-[10px] font-semibold transition ${age === a ? "border-[color:var(--color-reel-rose)] bg-[color:var(--color-reel-rose)]/15 text-white" : "border-white/10 bg-white/[0.03] text-white/50"}`}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={building}
+            className="w-full rounded-full bg-[color:var(--color-reel-rose)] py-3.5 font-semibold text-neutral-950 transition active:scale-[0.99] disabled:opacity-60"
+          >
+            {building ? "Writing…" : "Write the reel →"}
+          </button>
+          <p className="text-center [font-family:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/30">
+            A roadmap · private prompts · your best moves
+          </p>
+        </div>
       </form>
 
       {!hasCuratedTemplate(city) && (
