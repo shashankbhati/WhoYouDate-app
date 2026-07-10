@@ -16,6 +16,7 @@ import { Header } from "../components/datedata/Header";
 import { Toaster } from "../components/ui/sonner";
 import { AuthModal } from "../components/auth/AuthModal";
 import { UsernameSetup } from "../components/auth/UsernameSetup";
+import { InstallPrompt } from "../components/InstallPrompt";
 import { useAuthState } from "../lib/auth";
 import { useStore, takePendingEntry, addEntry } from "../lib/datedata/store";
 
@@ -295,6 +296,7 @@ function RootComponent() {
         <Toaster />
         <AuthModal open={modal.open} message={modal.message} />
         <UsernameSetup open={showUsernameSetup} onDone={() => setShowUsernameSetup(false)} />
+        <InstallPrompt />
       </div>
     </QueryClientProvider>
   );
