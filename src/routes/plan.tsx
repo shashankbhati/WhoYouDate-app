@@ -17,13 +17,12 @@ import { fmtMoney } from "@/lib/dateplan/cost";
 import { getCountryConfig } from "@/lib/country";
 import {
   TIME_META,
-  LEVEL_META,
-  REWARD_LABEL,
   BUDGET_META,
   type TimeOfDay,
   type AgeRange,
   type Budget,
   type DatePlan,
+  type RoadmapStop,
   type Move,
 } from "@/lib/dateplan/types";
 import { toast } from "sonner";
@@ -401,7 +400,7 @@ function PlanView({
   };
   shareKey: string;
 }) {
-  const [chosen, setChosen] = useState<Record<number, Move>>({});
+  const [lastMove, setLastMove] = useState<Move | undefined>(undefined);
   const [sharing, setSharing] = useState(false);
   const totalMin = plan.steps.reduce((a, s) => a + (s.type === "stop" ? s.minutes : 0), 0);
   const hrs = Math.round((totalMin / 60) * 10) / 10;
@@ -437,142 +436,38 @@ function PlanView({
 
   return (
     <section className="mt-8">
-      {/* Result header — the "this is a real thing, not a chatbot reply" block */}
-      <div className="rounded-2xl border border-border bg-gradient-to-b from-primary/[0.06] to-transparent p-5">
-        <h2 className="text-2xl font-bold">{plan.headline}</h2>
-        {plan.weatherBanner && (
-          <p className="mt-2 text-sm rounded-xl bg-muted px-3 py-2">{plan.weatherBanner}</p>
-        )}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Stat label="Duration" value={`~${hrs} hrs`} />
-          <Stat label="Est. cost" value={`~${fmtMoney(plan.totalCents, plan.currency)}`} />
-          {proof && <Stat label="2nd-date rate here" value={`${proof.secondPct}%`} />}
-        </div>
-        {proof ? (
-          <p className="mt-3 text-xs text-muted-foreground">
-            📊 Built from{" "}
-            <span className="text-foreground font-semibold">{proof.count} real dates</span> logged
-            in {plan.city}, weighted to your budget and age.
+      {/* Header meta */}
+      <div className="mb-3 flex items-end justify-between px-1">
+        <div>
+          <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            {plan.timeOfDay} · {plan.city}
           </p>
-        ) : (
-          <p className="mt-3 text-xs text-muted-foreground">{plan.subline}</p>
-        )}
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">{plan.headline}</h2>
+        </div>
       </div>
 
-      {/* The timeline */}
-      <ol className="relative mt-6 ml-3 border-l border-border/70 pl-6 space-y-6">
-        {plan.steps.map((step) =>
-          step.type === "stop" ? (
-            <li key={step.order} className="relative">
-              <span className="absolute -left-[31px] top-1.5 h-3.5 w-3.5 rounded-full bg-primary ring-4 ring-background" />
-              {step.timeLabel && (
-                <div className="text-xs font-mono text-muted-foreground mb-1">{step.timeLabel}</div>
-              )}
-              <div className="rounded-2xl border border-border bg-card p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-bold">
-                    <span className="mr-1.5">{step.emoji}</span>
-                    {step.title}
-                  </h3>
-                  <span className="text-xs text-muted-foreground shrink-0 text-right">
-                    {step.minutes} min
-                    {step.estCents != null && (
-                      <div className="text-foreground font-semibold">
-                        {step.estCents === 0
-                          ? "free"
-                          : `~${fmtMoney(step.estCents, plan.currency)}`}
-                      </div>
-                    )}
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">{step.scene}</p>
+      {plan.weatherBanner && (
+        <p className="text-sm rounded-xl bg-muted px-3 py-2 mb-3">{plan.weatherBanner}</p>
+      )}
 
-                {step.venue && (
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    {step.venue.rating != null && (
-                      <span className="text-amber-500 font-semibold">
-                        ★ {step.venue.rating.toFixed(1)}
-                      </span>
-                    )}
-                    {step.venue.priceTier != null && (
-                      <span className="text-muted-foreground">
-                        {"€".repeat(step.venue.priceTier)}
-                      </span>
-                    )}
-                    {step.venue.area && (
-                      <span className="text-muted-foreground">📍 {step.venue.area}</span>
-                    )}
-                    {step.venue.seed && (
-                      <span className="text-muted-foreground/70 italic">starter pick</span>
-                    )}
-                  </div>
-                )}
-                {step.venue?.note && (
-                  <p className="text-xs text-muted-foreground mt-1">💡 {step.venue.note}</p>
-                )}
+      {/* The story reel */}
+      <StoryReel plan={plan} onPick={setLastMove} />
 
-                {step.weatherNote && (
-                  <p className="mt-2 text-xs rounded-lg bg-muted px-3 py-2">{step.weatherNote}</p>
-                )}
+      {/* Stats */}
+      <div className="mt-4 flex flex-wrap gap-2 justify-center">
+        <Stat label="Duration" value={`~${hrs} hrs`} />
+        <Stat label="Est. cost" value={`~${fmtMoney(plan.totalCents, plan.currency)}`} />
+        {proof && <Stat label="2nd-date rate" value={`${proof.secondPct}%`} />}
+      </div>
+      {proof && (
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          📊 Built from{" "}
+          <span className="text-foreground font-semibold">{proof.count} real dates</span> in{" "}
+          {plan.city}.
+        </p>
+      )}
 
-                {step.questions.length > 0 && (
-                  <div className="mt-3 rounded-xl bg-primary/5 border border-primary/15 px-3 py-2.5">
-                    <p className="text-[11px] uppercase tracking-wider font-bold text-primary/80">
-                      Ask here
-                    </p>
-                    <ul className="mt-1.5 space-y-1.5">
-                      {step.questions.map((q) => (
-                        <li key={q.text} className="text-sm flex gap-2">
-                          <span className="text-primary/50 shrink-0">›</span>
-                          <span>“{q.text}”</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </li>
-          ) : (
-            <li key={step.order} className="relative">
-              <span className="absolute -left-[33px] top-1.5 h-4 w-4 rounded-full border-2 border-dashed border-primary bg-background" />
-              <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/[0.03] p-4">
-                <p className="font-bold text-sm">🎯 {step.prompt}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Pick the one that fits the vibe — each is rated by risk and payoff.
-                </p>
-                <div className="mt-3 grid gap-2.5">
-                  {step.options.map((m) => {
-                    const isPicked = chosen[step.order]?.id === m.id;
-                    const lm = LEVEL_META[m.risk];
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() =>
-                          setChosen((c) => ({ ...c, [step.order]: isPicked ? undefined! : m }))
-                        }
-                        className={`text-left rounded-xl border p-3.5 transition ${isPicked ? "border-primary bg-primary/10" : "border-border bg-card hover:border-border/80"}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>{lm.dot}</span>
-                          <span className={`text-xs font-bold ${lm.color}`}>{lm.label}</span>
-                          <span className="text-xs text-muted-foreground">
-                            · {REWARD_LABEL[m.reward]}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium mt-1.5">{m.label}</p>
-                        {m.hint && <p className="text-xs text-muted-foreground mt-1">{m.hint}</p>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </li>
-          ),
-        )}
-      </ol>
-
-      <div className="mt-6 grid sm:grid-cols-2 gap-3">
+      <div className="mt-5 grid sm:grid-cols-2 gap-3">
         <button
           onClick={onAnother}
           disabled={building}
@@ -589,10 +484,10 @@ function PlanView({
         </button>
       </div>
       <p className="mt-2 text-center text-xs text-muted-foreground">
-        They'll see the plan (and can tweak it) — but never your budget, questions, or moves.
+        They'll see the plan (and can tweak it) — but never your budget, prompts, or moves.
       </p>
 
-      <ReviewCard input={input} chosen={chosen} />
+      <ReviewCard input={input} lastMove={lastMove} />
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
         Tip: log the date afterwards on your{" "}
@@ -602,6 +497,182 @@ function PlanView({
         to sharpen future plans.
       </p>
     </section>
+  );
+}
+
+// ── The Story Reel — each stop is a full-screen, swipeable "chapter" ──────────
+const REEL_BGS = [
+  "linear-gradient(160deg, oklch(0.35 0.12 30), oklch(0.18 0.05 285))",
+  "linear-gradient(160deg, oklch(0.28 0.08 40), oklch(0.16 0.03 260))",
+  "linear-gradient(180deg, oklch(0.22 0.05 260), oklch(0.14 0.02 260))",
+  "linear-gradient(160deg, oklch(0.3 0.09 350), oklch(0.16 0.04 300))",
+];
+
+function StoryReel({ plan, onPick }: { plan: DatePlan; onPick: (m: Move) => void }) {
+  const stops = plan.steps.filter((s): s is RoadmapStop => s.type === "stop");
+  const [idx, setIdx] = useState(0);
+  const [drawer, setDrawer] = useState(true);
+  const [pick, setPick] = useState<"safe" | "risky" | null>(null);
+  const s = stops[idx];
+  if (!s) return null;
+
+  const go = (i: number) => {
+    setIdx(Math.max(0, Math.min(stops.length - 1, i)));
+    setPick(null);
+    setDrawer(true);
+  };
+  const kind = s.title.split(" — ")[0];
+  const place = s.venue?.name ?? s.title;
+  const startTime = s.timeLabel?.split(" – ")[0] ?? "";
+  const cost = s.estCents === 0 ? "free" : `~${fmtMoney(s.estCents ?? 0, plan.currency)}`;
+
+  return (
+    <div className="[font-family:var(--font-sans)] text-white">
+      <div className="relative mx-auto aspect-[9/16] w-full max-w-[380px] overflow-hidden rounded-[36px] bg-[color:var(--color-reel-bg)] shadow-2xl ring-1 ring-white/10">
+        {/* Chapter progress */}
+        <div className="absolute inset-x-4 top-4 z-30 flex gap-1.5">
+          {stops.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => go(i)}
+              className="h-1 flex-1 overflow-hidden rounded-full bg-white/15"
+              aria-label={`Chapter ${i + 1}`}
+            >
+              <span
+                className={`block h-full rounded-full ${i <= idx ? "w-full bg-white" : "w-0"}`}
+              />
+            </button>
+          ))}
+        </div>
+
+        {/* Background */}
+        <div
+          className="absolute inset-0 z-0"
+          style={{ background: REEL_BGS[idx % REEL_BGS.length] }}
+        />
+        <div className="absolute inset-x-0 bottom-0 z-0 h-2/3 bg-gradient-to-t from-[color:var(--color-reel-bg)] via-[color:var(--color-reel-bg)]/60 to-transparent" />
+
+        {/* Tap zones */}
+        <button
+          className="absolute left-0 top-0 z-10 h-full w-1/3"
+          aria-label="Previous"
+          onClick={() => go(idx - 1)}
+        />
+        <button
+          className="absolute right-0 top-0 z-10 h-full w-1/3"
+          aria-label="Next"
+          onClick={() => go(idx + 1)}
+        />
+
+        {/* Content */}
+        <div className="relative z-20 flex h-full flex-col p-6 pt-14">
+          <p className="[font-family:var(--font-mono)] text-[11px] uppercase tracking-[0.25em] text-white/60">
+            {s.emoji} Chapter {idx + 1} · {kind}
+          </p>
+          {startTime && (
+            <span className="[font-family:var(--font-display)] mt-2 text-6xl font-extrabold leading-none tracking-tight text-white/90">
+              {startTime}
+            </span>
+          )}
+          <h3 className="mt-3 text-3xl font-semibold leading-[1.05] tracking-tight text-balance">
+            {place}
+          </h3>
+          <p className="mt-3 max-w-[28ch] text-sm text-white/70">{s.scene}</p>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {s.venue?.rating != null && (
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
+                ★ {s.venue.rating.toFixed(1)}
+              </span>
+            )}
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
+              {cost}
+            </span>
+            {s.venue?.area && (
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
+                📍 {s.venue.area}
+              </span>
+            )}
+          </div>
+
+          {s.weatherNote && <p className="mt-3 text-[11px] text-white/60">{s.weatherNote}</p>}
+
+          <div className="mt-auto">
+            {!drawer && (
+              <button
+                onClick={() => setDrawer(true)}
+                className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium backdrop-blur"
+              >
+                <span className="size-1.5 rounded-full bg-[color:var(--color-reel-rose)]" /> Open
+                whisper
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Whisper drawer — the private layer (only the planner sees this) */}
+        {drawer && (
+          <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-3xl bg-[color:var(--color-reel-surface)] p-5 pb-6 ring-1 ring-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.5)]">
+            <button
+              onClick={() => setDrawer(false)}
+              className="mx-auto mb-4 block h-1 w-10 rounded-full bg-white/20"
+              aria-label="Close whisper"
+            />
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="size-1.5 rounded-full bg-[color:var(--color-reel-rose)]" />
+                <p className="[font-family:var(--font-mono)] text-[10px] font-bold uppercase tracking-[0.25em] text-white/60">
+                  Whisper · only you
+                </p>
+              </div>
+              <span className="[font-family:var(--font-mono)] text-[10px] text-white/40">
+                {idx + 1}/{stops.length}
+              </span>
+            </div>
+
+            {s.questions[0] && (
+              <p className="[font-family:var(--font-serif)] mb-4 text-lg italic leading-snug text-balance">
+                “{s.questions[0].text}”
+              </p>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              {s.safe && (
+                <button
+                  onClick={() => {
+                    setPick("safe");
+                    onPick(s.safe!);
+                  }}
+                  className={`-rotate-1 rounded-2xl border p-3 text-left transition ${pick === "safe" ? "border-white bg-white text-neutral-950" : "border-white/15 bg-white/[0.03] text-white/90"}`}
+                >
+                  <p className="[font-family:var(--font-mono)] text-[9px] font-bold uppercase tracking-widest opacity-70">
+                    Safe move
+                  </p>
+                  <p className="mt-1 text-xs leading-snug">{s.safe.label}</p>
+                </button>
+              )}
+              {s.risky && (
+                <button
+                  onClick={() => {
+                    setPick("risky");
+                    onPick(s.risky!);
+                  }}
+                  className={`rotate-1 rounded-2xl border p-3 text-left transition ${pick === "risky" ? "border-[color:var(--color-reel-rose)] bg-[color:var(--color-reel-rose)] text-neutral-950" : "border-[color:var(--color-reel-rose)]/40 bg-[color:var(--color-reel-rose-soft)]/40 text-[color:var(--color-reel-rose)]"}`}
+                >
+                  <p className="[font-family:var(--font-mono)] text-[9px] font-bold uppercase tracking-widest opacity-80">
+                    Risky move
+                  </p>
+                  <p className="mt-1 text-xs leading-snug">{s.risky.label}</p>
+                </button>
+              )}
+            </div>
+            <p className="mt-3 text-center [font-family:var(--font-mono)] text-[9px] uppercase tracking-widest text-white/40">
+              Only you can see this · tap sides to move
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -617,7 +688,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 // Post-date review — the outcome loop that turns risk/reward labels into real stats.
 function ReviewCard({
   input,
-  chosen,
+  lastMove,
 }: {
   input: {
     partnerName: string;
@@ -626,7 +697,7 @@ function ReviewCard({
     timeOfDay: TimeOfDay;
     ageRange: AgeRange;
   };
-  chosen: Record<number, Move>;
+  lastMove?: Move;
 }) {
   const [open, setOpen] = useState(false);
   const [wentWell, setWentWell] = useState(0);
@@ -636,7 +707,6 @@ function ReviewCard({
 
   async function send() {
     if (!wentWell) return toast.error("Rate how it went first.");
-    const lastMove = Object.values(chosen).filter(Boolean).slice(-1)[0];
     const res = await submitReview({
       input,
       chosenMove: lastMove,

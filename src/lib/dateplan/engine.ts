@@ -117,26 +117,28 @@ function pickVenue(
   return chosen;
 }
 
-// Offer a low/med/high spread for THIS decision's stage. Mid-date decisions pull
-// "keep it going" moves; the final one pulls "finish it" moves — so the two feel
-// different. Falls back across stages only if a risk bucket is empty.
-function pickMoves(timeOfDay: PlanInput["timeOfDay"], stage: Move["stage"], seed: number): Move[] {
-  const bucketFor = (risk: Level): Move[] => {
-    let pool = MOVES.filter(
-      (m) => m.times.includes(timeOfDay) && m.stage === stage && m.risk === risk,
-    );
-    if (pool.length === 0)
-      pool = MOVES.filter((m) => m.times.includes(timeOfDay) && m.risk === risk);
-    return pool.sort(
-      (a, b) => rewardRank[b.reward] - rewardRank[a.reward] || a.id.localeCompare(b.id),
-    );
-  };
-  const out: Move[] = [];
-  (["low", "med", "high"] as Level[]).forEach((risk, i) => {
-    const bucket = bucketFor(risk);
-    if (bucket.length) out.push(bucket[(seed + i) % bucket.length]);
-  });
-  return out;
+// Pick one move of a given risk for a stop — prefers the stop's stage, avoids
+// repeating a move already used earlier in the plan, deterministic.
+function pickOneMove(
+  timeOfDay: PlanInput["timeOfDay"],
+  stage: Move["stage"],
+  risk: Level,
+  used: Set<string>,
+  seed: number,
+): Move | undefined {
+  const pool = MOVES.filter((m) => m.times.includes(timeOfDay) && m.risk === risk);
+  if (pool.length === 0) return undefined;
+  let avail = pool.filter((m) => !used.has(m.id));
+  if (avail.length === 0) avail = pool;
+  avail = avail.sort(
+    (a, b) =>
+      (b.stage === stage ? 1 : 0) - (a.stage === stage ? 1 : 0) ||
+      rewardRank[b.reward] - rewardRank[a.reward] ||
+      a.id.localeCompare(b.id),
+  );
+  const chosen = avail[seed % avail.length];
+  used.add(chosen.id);
+  return chosen;
 }
 
 export function buildPlan(
@@ -167,15 +169,16 @@ export function buildPlan(
 
   const used = new Set<string>();
   const usedQ = new Set<string>();
+  const usedSafe = new Set<string>();
+  const usedRisky = new Set<string>();
   let stopSeed = seed;
-  let decisionSeed = seed;
   let clock = START_MIN[timeOfDay];
   let totalCents = 0;
   let leadAdjusted = false;
   const steps: PlanStep[] = [];
   let order = 1;
 
-  chosen.forEach((spec, i) => {
+  chosen.forEach((spec) => {
     const venue = spec.slot
       ? pickVenue(venues, spec.slot, timeOfDay, band, aim, maxTier, used, stopSeed)
       : undefined;
@@ -204,6 +207,9 @@ export function buildPlan(
     }
 
     const qs = pickQuestions(spec.questionStage, ageRange, usedQ, stopSeed, 3);
+    // Each chapter gets a safe (low-risk) + risky (high-risk) move for its moment.
+    const safe = pickOneMove(timeOfDay, spec.questionStage, "low", usedSafe, stopSeed);
+    const risky = pickOneMove(timeOfDay, spec.questionStage, "high", usedRisky, stopSeed);
     stopSeed++;
 
     const minutes = clampMinutes(spec.slot, spec.minutes * scale);
@@ -224,27 +230,13 @@ export function buildPlan(
       estCents,
       venue,
       questions: qs,
+      safe,
+      risky,
       weatherNote,
     });
-
-    // A mid-date decision after the 2nd stop, only on longer (3–4 stop) dates.
-    if (chosen.length >= 3 && i === 1) {
-      const options = pickMoves(timeOfDay, "mid", decisionSeed++);
-      if (options.length)
-        steps.push({ type: "decision", order: order++, prompt: "What's your move?", options });
-    }
   });
 
-  // Always finish with an end-of-date decision.
-  const finalOptions = pickMoves(timeOfDay, "late", decisionSeed++);
-  if (finalOptions.length) {
-    steps.push({
-      type: "decision",
-      order: order++,
-      prompt: "How do you want to end it?",
-      options: finalOptions,
-    });
-  }
+  // (No separate decision steps: each chapter carries its own safe/risky moves.)
 
   const totalMin = steps.reduce((a, s) => a + (s.type === "stop" ? s.minutes : 0), 0);
   const hrs = Math.round((totalMin / 60) * 10) / 10;

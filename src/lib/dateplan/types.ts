@@ -71,6 +71,8 @@ export interface RoadmapStop {
   estCents?: number; // per-person cost estimate for this stop (0 = free)
   venue?: Venue; // the chosen place, if the slot was filled
   questions: Question[]; // 3–4 things to ask here
+  safe?: Move; // low-risk "move" for this moment (the reel's safe card)
+  risky?: Move; // high-risk "move" (the reel's risky card)
   weatherNote?: string; // set when weather forces an indoor swap etc.
 }
 
