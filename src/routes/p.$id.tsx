@@ -56,7 +56,6 @@ function SharedPlanView({ id }: { id: string }) {
   const [plan, setPlan] = useState<SharedPlan | null>(null);
   const [me, setMe] = useState<{ id: string; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [openSwap, setOpenSwap] = useState<number | null>(null);
 
   const isOwner = !!plan && !!me && plan.ownerId === me.id;
 
@@ -98,7 +97,6 @@ function SharedPlanView({ id }: { id: string }) {
       };
     });
     setPlan({ ...plan, steps, status: "changed" });
-    setOpenSwap(null);
     const ok = await saveSharedSteps(id, steps, me?.name ?? "Your date");
     if (!ok) toast.error("Couldn't save the change — try again.");
   }
@@ -154,69 +152,7 @@ function SharedPlanView({ id }: { id: string }) {
         </p>
       )}
 
-      <ol className="relative ml-3 border-l border-border/70 pl-6 space-y-5">
-        {plan.steps.map((s) => {
-          const alts = s.venue
-            ? cityVenues.filter((v) => v.kind === s.venue!.kind && v.id !== s.venue!.id)
-            : [];
-          return (
-            <li key={s.order} className="relative">
-              <span className="absolute -left-[31px] top-1.5 h-3.5 w-3.5 rounded-full bg-primary ring-4 ring-background" />
-              {s.timeLabel && (
-                <div className="text-xs font-mono text-muted-foreground mb-1">{s.timeLabel}</div>
-              )}
-              <div className="rounded-2xl border border-border bg-card p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-bold">
-                    <span className="mr-1.5">{s.emoji}</span>
-                    {s.title}
-                  </h3>
-                  <span className="text-xs text-muted-foreground shrink-0">{s.minutes} min</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">{s.scene}</p>
-                {s.venue && (
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    {s.venue.rating != null && (
-                      <span className="text-amber-500 font-semibold">
-                        ★ {s.venue.rating.toFixed(1)}
-                      </span>
-                    )}
-                    {s.venue.area && (
-                      <span className="text-muted-foreground">📍 {s.venue.area}</span>
-                    )}
-                    {alts.length > 0 && (
-                      <button
-                        onClick={() => setOpenSwap(openSwap === s.order ? null : s.order)}
-                        className="text-primary hover:underline font-medium"
-                      >
-                        {openSwap === s.order ? "close" : "swap ↺"}
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {openSwap === s.order && alts.length > 0 && (
-                  <div className="mt-3 rounded-xl border border-border bg-background/50 p-2 space-y-1">
-                    <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground px-1">
-                      Prefer somewhere else?
-                    </p>
-                    {alts.slice(0, 6).map((v) => (
-                      <button
-                        key={v.id}
-                        onClick={() => swap(s.order, v)}
-                        className="w-full text-left rounded-lg px-2.5 py-2 text-sm hover:bg-muted transition flex items-center justify-between gap-2"
-                      >
-                        <span>{v.name}</span>
-                        {v.area && <span className="text-xs text-muted-foreground">{v.area}</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+      <SharedReel plan={plan} cityVenues={cityVenues} onSwap={swap} />
 
       {/* Accept (recipient only, until accepted) */}
       {!isOwner && plan.status !== "accepted" && (
@@ -337,6 +273,149 @@ function MessageThread({
           Send
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── Recipient's Story Reel (venues + timing only; swap in a drawer) ───────────
+const REEL_BGS = [
+  "linear-gradient(160deg, oklch(0.35 0.12 30), oklch(0.18 0.05 285))",
+  "linear-gradient(160deg, oklch(0.28 0.08 40), oklch(0.16 0.03 260))",
+  "linear-gradient(180deg, oklch(0.22 0.05 260), oklch(0.14 0.02 260))",
+  "linear-gradient(160deg, oklch(0.3 0.09 350), oklch(0.16 0.04 300))",
+];
+
+function SharedReel({
+  plan,
+  cityVenues,
+  onSwap,
+}: {
+  plan: SharedPlan;
+  cityVenues: Venue[];
+  onSwap: (order: number, v: Venue) => void;
+}) {
+  const stops = plan.steps;
+  const [idx, setIdx] = useState(0);
+  const [drawer, setDrawer] = useState(false);
+  const s = stops[idx];
+  if (!s) return null;
+
+  const go = (i: number) => {
+    setIdx(Math.max(0, Math.min(stops.length - 1, i)));
+    setDrawer(false);
+  };
+  const kind = s.title.split(" — ")[0];
+  const place = s.venue?.name ?? s.title;
+  const startTime = s.timeLabel?.split(" – ")[0] ?? "";
+  const alts = s.venue
+    ? cityVenues.filter((v) => v.kind === s.venue!.kind && v.id !== s.venue!.id)
+    : [];
+
+  return (
+    <div className="[font-family:var(--font-sans)] text-white">
+      <div className="relative mx-auto aspect-[9/16] w-full max-w-[380px] overflow-hidden rounded-[36px] bg-[color:var(--color-reel-bg)] shadow-2xl ring-1 ring-white/10">
+        <div className="absolute inset-x-4 top-4 z-30 flex gap-1.5">
+          {stops.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => go(i)}
+              className="h-1 flex-1 overflow-hidden rounded-full bg-white/15"
+              aria-label={`Chapter ${i + 1}`}
+            >
+              <span
+                className={`block h-full rounded-full ${i <= idx ? "w-full bg-white" : "w-0"}`}
+              />
+            </button>
+          ))}
+        </div>
+
+        <div
+          className="absolute inset-0 z-0"
+          style={{ background: REEL_BGS[idx % REEL_BGS.length] }}
+        />
+        <div className="absolute inset-x-0 bottom-0 z-0 h-2/3 bg-gradient-to-t from-[color:var(--color-reel-bg)] via-[color:var(--color-reel-bg)]/60 to-transparent" />
+
+        <button
+          className="absolute left-0 top-0 z-10 h-full w-1/3"
+          aria-label="Previous"
+          onClick={() => go(idx - 1)}
+        />
+        <button
+          className="absolute right-0 top-0 z-10 h-full w-1/3"
+          aria-label="Next"
+          onClick={() => go(idx + 1)}
+        />
+
+        <div className="relative z-20 flex h-full flex-col p-6 pt-14">
+          <p className="[font-family:var(--font-mono)] text-[11px] uppercase tracking-[0.25em] text-white/60">
+            {s.emoji} Chapter {idx + 1} · {kind}
+          </p>
+          {startTime && (
+            <span className="[font-family:var(--font-display)] mt-2 text-6xl font-extrabold leading-none tracking-tight text-white/90">
+              {startTime}
+            </span>
+          )}
+          <h3 className="mt-3 text-3xl font-semibold leading-[1.05] tracking-tight text-balance">
+            {place}
+          </h3>
+          <p className="mt-3 max-w-[28ch] text-sm text-white/70">{s.scene}</p>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {s.venue?.rating != null && (
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
+                ★ {s.venue.rating.toFixed(1)}
+              </span>
+            )}
+            {s.venue?.area && (
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
+                📍 {s.venue.area}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-auto">
+            {s.venue && alts.length > 0 && !drawer && (
+              <button
+                onClick={() => setDrawer(true)}
+                className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium backdrop-blur"
+              >
+                ↺ Swap this spot
+              </button>
+            )}
+          </div>
+        </div>
+
+        {drawer && s.venue && alts.length > 0 && (
+          <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-3xl bg-[color:var(--color-reel-surface)] p-5 pb-6 ring-1 ring-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.5)]">
+            <button
+              onClick={() => setDrawer(false)}
+              className="mx-auto mb-4 block h-1 w-10 rounded-full bg-white/20"
+              aria-label="Close"
+            />
+            <p className="[font-family:var(--font-mono)] mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-white/60">
+              Prefer somewhere else?
+            </p>
+            <div className="space-y-1.5 max-h-56 overflow-y-auto">
+              {alts.slice(0, 8).map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => {
+                    onSwap(s.order, v);
+                    setDrawer(false);
+                  }}
+                  className="w-full text-left rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm hover:bg-white/[0.06] transition flex items-center justify-between gap-2"
+                >
+                  <span>{v.name}</span>
+                  {v.area && <span className="text-xs text-white/50">{v.area}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <p className="mt-3 text-center [font-family:var(--font-mono)] text-[10px] uppercase tracking-widest text-muted-foreground">
+        Tap the sides to move · {idx + 1}/{stops.length}
+      </p>
     </div>
   );
 }
