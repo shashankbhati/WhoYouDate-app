@@ -34,6 +34,7 @@ export interface SharedPlan {
   ownerId: string;
   ownerName?: string;
   city: string;
+  date?: string; // the actual date of the date (yyyy-mm-dd)
   weatherBanner?: string;
   steps: SharedStep[];
   status: SharedStatus;
@@ -101,6 +102,7 @@ function stableId(s: string): string {
 export async function sharePlan(
   plan: DatePlan,
   planKey: string,
+  planDate?: string,
 ): Promise<{ ok: boolean; url?: string; error?: string; reused?: boolean }> {
   if (typeof window === "undefined") return { ok: false };
   const {
@@ -121,14 +123,21 @@ export async function sharePlan(
 
   const ownerName =
     (user.user_metadata?.full_name || user.user_metadata?.name || "").toString().trim() || null;
-  const { error } = await supabase.from("shared_plans").insert({
+  // Include plan_date if the column exists; retry without it if the comms
+  // migration hasn't been run yet, so sharing still works.
+  const base = {
     id,
     owner_id: user.id,
     owner_name: ownerName,
     city: plan.city,
     weather_banner: plan.weatherBanner ?? null,
     steps: sanitize(plan),
-  });
+  };
+  let error = (await supabase.from("shared_plans").insert({ ...base, plan_date: planDate ?? null }))
+    .error;
+  if (error && /plan_date/.test(error.message)) {
+    error = (await supabase.from("shared_plans").insert(base)).error;
+  }
   if (error) {
     // A concurrent double-click may race to the same id — treat as reuse.
     if ((error as { code?: string }).code === "23505") return { ok: true, url, reused: true };
@@ -147,6 +156,7 @@ function rowToShared(data: any): SharedPlan {
     ownerId: data.owner_id,
     ownerName: data.owner_name ?? undefined,
     city: data.city,
+    date: data.plan_date ?? undefined,
     weatherBanner: data.weather_banner ?? undefined,
     steps: (data.steps ?? []) as SharedStep[],
     status: (data.status ?? "pending") as SharedStatus,

@@ -10,6 +10,7 @@ ALTER TABLE shared_plans ADD COLUMN IF NOT EXISTS messages      jsonb DEFAULT '[
 ALTER TABLE shared_plans ADD COLUMN IF NOT EXISTS last_actor    text;                   -- who last touched it
 ALTER TABLE shared_plans ADD COLUMN IF NOT EXISTS updated_at    timestamptz DEFAULT now();
 ALTER TABLE shared_plans ADD COLUMN IF NOT EXISTS owner_seen_at timestamptz;            -- for the owner "new update" indicator
+ALTER TABLE shared_plans ADD COLUMN IF NOT EXISTS plan_date     text;                    -- the actual date of the date (yyyy-mm-dd), shown to the recipient
 
 -- Enable Realtime so the sender's open page updates live when the recipient edits.
 DO $$

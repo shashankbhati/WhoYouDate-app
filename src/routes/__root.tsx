@@ -83,27 +83,60 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1, viewport-fit=cover",
+      },
+      { name: "theme-color", content: "#0a0a0a" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "WhoAmIDating" },
       { title: "WhoAmIDating — Anonymous Dating Cost Tracker & Community Ledger" },
-      { name: "description", content: "See how much people really spend on dates in Berlin, Delhi, New York and more. Search any name, track your own dates anonymously. Real data from real people." },
-      { name: "keywords", content: "dating cost, how much does dating cost, dating expenses, date tracker, anonymous dating, dating in Berlin, dating in Delhi, dating ledger, dating statistics" },
+      {
+        name: "description",
+        content:
+          "See how much people really spend on dates in Berlin, Delhi, New York and more. Search any name, track your own dates anonymously. Real data from real people.",
+      },
+      {
+        name: "keywords",
+        content:
+          "dating cost, how much does dating cost, dating expenses, date tracker, anonymous dating, dating in Berlin, dating in Delhi, dating ledger, dating statistics",
+      },
       { name: "author", content: "WhoAmIDating" },
       { property: "og:title", content: "WhoAmIDating — How Much Does Dating Really Cost?" },
-      { property: "og:description", content: "Anonymous community ledger of real dating costs. Search any name. See what people spend on dates in your city." },
+      {
+        property: "og:description",
+        content:
+          "Anonymous community ledger of real dating costs. Search any name. See what people spend on dates in your city.",
+      },
       { property: "og:url", content: "https://www.whoamidating.singles/" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@whoamidating" },
       { name: "twitter:title", content: "WhoAmIDating — How Much Does Dating Really Cost?" },
-      { name: "twitter:description", content: "Anonymous community ledger of real dating costs. Search any name. See what people spend on dates in your city." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b36138f3-1977-4255-a689-253906a7d5ef/id-preview-bc380d38--cb4d77ac-7f23-46df-84df-d3a2282e1fec.lovable.app-1780072729691.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b36138f3-1977-4255-a689-253906a7d5ef/id-preview-bc380d38--cb4d77ac-7f23-46df-84df-d3a2282e1fec.lovable.app-1780072729691.png" },
+      {
+        name: "twitter:description",
+        content:
+          "Anonymous community ledger of real dating costs. Search any name. See what people spend on dates in your city.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b36138f3-1977-4255-a689-253906a7d5ef/id-preview-bc380d38--cb4d77ac-7f23-46df-84df-d3a2282e1fec.lovable.app-1780072729691.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b36138f3-1977-4255-a689-253906a7d5ef/id-preview-bc380d38--cb4d77ac-7f23-46df-84df-d3a2282e1fec.lovable.app-1780072729691.png",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "canonical", href: "https://www.whoamidating.singles/" },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "apple-touch-icon", href: "/icon.png" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
   shellComponent: RootShell,
@@ -119,9 +152,17 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
         {/* Google Analytics 4 */}
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-NGJMVTG1LT" />
-        <script dangerouslySetInnerHTML={{ __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-NGJMVTG1LT');` }} />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-NGJMVTG1LT');`,
+          }}
+        />
         {/* Microsoft Clarity */}
-        <script dangerouslySetInnerHTML={{ __html: `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","xbjro39sbc");` }} />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","xbjro39sbc");`,
+          }}
+        />
       </head>
       <body>
         {children}
@@ -142,25 +183,57 @@ function Footer() {
           </p>
         </div>
         <div>
-          <h4 className="text-xs font-bold tracking-widest text-muted-foreground mb-4">THE PROJECT</h4>
+          <h4 className="text-xs font-bold tracking-widest text-muted-foreground mb-4">
+            THE PROJECT
+          </h4>
           <ul className="space-y-2 text-sm">
-            <li><Link to="/privacy" className="text-foreground hover:text-primary transition">About</Link></li>
-            <li><Link to="/privacy" className="text-foreground hover:text-primary transition">How anonymity works</Link></li>
-            <li><Link to="/privacy" className="text-foreground hover:text-primary transition">Privacy &amp; data</Link></li>
+            <li>
+              <Link to="/privacy" className="text-foreground hover:text-primary transition">
+                About
+              </Link>
+            </li>
+            <li>
+              <Link to="/privacy" className="text-foreground hover:text-primary transition">
+                How anonymity works
+              </Link>
+            </li>
+            <li>
+              <Link to="/privacy" className="text-foreground hover:text-primary transition">
+                Privacy &amp; data
+              </Link>
+            </li>
           </ul>
         </div>
         <div>
-          <h4 className="text-xs font-bold tracking-widest text-muted-foreground mb-4">COMMUNITY</h4>
+          <h4 className="text-xs font-bold tracking-widest text-muted-foreground mb-4">
+            COMMUNITY
+          </h4>
           <ul className="space-y-2 text-sm">
-            <li><Link to="/" className="text-foreground hover:text-primary transition">Feed</Link></li>
-            <li><Link to="/stats" className="text-foreground hover:text-primary transition">Your ledger</Link></li>
-            <li><Link to="/log" className="text-foreground hover:text-primary transition">Log an entry</Link></li>
+            <li>
+              <Link to="/" className="text-foreground hover:text-primary transition">
+                Feed
+              </Link>
+            </li>
+            <li>
+              <Link to="/stats" className="text-foreground hover:text-primary transition">
+                Your ledger
+              </Link>
+            </li>
+            <li>
+              <Link to="/log" className="text-foreground hover:text-primary transition">
+                Log an entry
+              </Link>
+            </li>
           </ul>
         </div>
         <div>
-          <h4 className="text-xs font-bold tracking-widest text-muted-foreground mb-4">METHODOLOGY</h4>
+          <h4 className="text-xs font-bold tracking-widest text-muted-foreground mb-4">
+            METHODOLOGY
+          </h4>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Every stat on this site is derived from the open community ledger. Numbers below ~25 entries are marked <em>thin sample</em>. Personally identifying inputs are scrubbed at entry time.
+            Every stat on this site is derived from the open community ledger. Numbers below ~25
+            entries are marked <em>thin sample</em>. Personally identifying inputs are scrubbed at
+            entry time.
           </p>
         </div>
       </div>
@@ -205,6 +278,13 @@ function RootComponent() {
       setShowUsernameSetup(false);
     }
   }, [isReal, profileChecked, profile]);
+
+  // Register the service worker so the app is installable (PWA).
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

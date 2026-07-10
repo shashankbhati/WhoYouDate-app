@@ -76,9 +76,16 @@ function SharedPlanView({ id }: { id: string }) {
     const unsub = subscribeSharedPlan(id, (fresh) => {
       if (alive) setPlan(fresh);
     });
+    // Fallback poll every 6s — so chat/edits still sync even if Realtime isn't
+    // enabled on the project yet.
+    const poll = setInterval(async () => {
+      const fresh = await loadSharedPlan(id);
+      if (alive && fresh) setPlan(fresh);
+    }, 6000);
     return () => {
       alive = false;
       unsub();
+      clearInterval(poll);
     };
   }, [id]);
 
@@ -140,7 +147,8 @@ function SharedPlanView({ id }: { id: string }) {
               : "A date, planned for you"}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          in {plan.city} · tweak anything you like
+          {plan.city}
+          {plan.date ? ` · ${fmtDate(plan.date)}` : ""} · tweak anything you like
         </p>
       </div>
 
@@ -297,6 +305,7 @@ function SharedReel({
   const stops = plan.steps;
   const [idx, setIdx] = useState(0);
   const [drawer, setDrawer] = useState(false);
+  const touchX = useRef(0);
   const s = stops[idx];
   if (!s) return null;
 
@@ -313,7 +322,15 @@ function SharedReel({
 
   return (
     <div className="[font-family:var(--font-sans)] text-white">
-      <div className="relative mx-auto aspect-[9/16] w-full max-w-[380px] overflow-hidden rounded-[36px] bg-[color:var(--color-reel-bg)] shadow-2xl ring-1 ring-white/10">
+      <div
+        onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
+        onTouchEnd={(e) => {
+          const dx = e.changedTouches[0].clientX - touchX.current;
+          if (dx < -45) go(idx + 1);
+          else if (dx > 45) go(idx - 1);
+        }}
+        className="relative mx-auto aspect-[9/16] w-full max-w-[380px] overflow-hidden rounded-[36px] bg-[color:var(--color-reel-bg)] shadow-2xl ring-1 ring-white/10"
+      >
         <div className="absolute inset-x-4 top-4 z-30 flex gap-1.5">
           {stops.map((_, i) => (
             <button
@@ -418,6 +435,18 @@ function SharedReel({
       </p>
     </div>
   );
+}
+
+function fmtDate(iso: string): string {
+  try {
+    return new Date(iso + "T00:00:00").toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
 }
 
 function Shell({ children }: { children: React.ReactNode }) {

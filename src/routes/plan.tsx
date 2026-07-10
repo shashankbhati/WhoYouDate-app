@@ -439,7 +439,7 @@ function PlanView({
   async function share(p: DatePlan) {
     if (sharing) return;
     setSharing(true);
-    const res = await sharePlan(p, shareKey);
+    const res = await sharePlan(p, shareKey, input.date);
     setSharing(false);
     if (res.error === "login") return openAuthModal("Sign in to share this plan with your date.");
     if (!res.ok || !res.url) return toast.error(res.error ?? "Couldn't create a share link.");
@@ -543,7 +543,10 @@ function StoryReel({ plan, onPick }: { plan: DatePlan; onPick: (m: Move) => void
   const stops = plan.steps.filter((s): s is RoadmapStop => s.type === "stop");
   const [idx, setIdx] = useState(0);
   const [drawer, setDrawer] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [pick, setPick] = useState<"safe" | "risky" | null>(null);
+  const touchX = useRef(0);
+  const touchY = useRef(0);
   const s = stops[idx];
   if (!s) return null;
 
@@ -551,6 +554,12 @@ function StoryReel({ plan, onPick }: { plan: DatePlan; onPick: (m: Move) => void
     setIdx(Math.max(0, Math.min(stops.length - 1, i)));
     setPick(null);
     setDrawer(true);
+    setExpanded(false);
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const dx = e.changedTouches[0].clientX - touchX.current;
+    if (dx < -45) go(idx + 1);
+    else if (dx > 45) go(idx - 1);
   };
   const kind = s.title.split(" — ")[0];
   const place = s.venue?.name ?? s.title;
@@ -559,7 +568,11 @@ function StoryReel({ plan, onPick }: { plan: DatePlan; onPick: (m: Move) => void
 
   return (
     <div className="[font-family:var(--font-sans)] text-white">
-      <div className="relative mx-auto aspect-[9/16] w-full max-w-[380px] overflow-hidden rounded-[36px] bg-[color:var(--color-reel-bg)] shadow-2xl ring-1 ring-white/10">
+      <div
+        onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
+        onTouchEnd={onTouchEnd}
+        className="relative mx-auto aspect-[9/16] w-full max-w-[380px] overflow-hidden rounded-[36px] bg-[color:var(--color-reel-bg)] shadow-2xl ring-1 ring-white/10"
+      >
         {/* Chapter progress */}
         <div className="absolute inset-x-4 top-4 z-30 flex gap-1.5">
           {stops.map((_, i) => (
@@ -641,13 +654,26 @@ function StoryReel({ plan, onPick }: { plan: DatePlan; onPick: (m: Move) => void
           </div>
         </div>
 
-        {/* Whisper drawer — the private layer (only the planner sees this) */}
+        {/* Whisper drawer — the private layer (only the planner sees this).
+            Pull up (swipe up / tap the handle) to reveal every prompt + a tip. */}
         {drawer && (
-          <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-3xl bg-[color:var(--color-reel-surface)] p-5 pb-6 ring-1 ring-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.5)]">
+          <div
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              touchY.current = e.touches[0].clientY;
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              const dy = e.changedTouches[0].clientY - touchY.current;
+              if (dy < -30) setExpanded(true);
+              else if (dy > 30) setExpanded(false);
+            }}
+            className={`absolute inset-x-0 bottom-0 z-30 rounded-t-3xl bg-[color:var(--color-reel-surface)] px-5 pb-6 pt-2 ring-1 ring-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.5)] ${expanded ? "max-h-[86%] overflow-y-auto" : ""}`}
+          >
             <button
-              onClick={() => setDrawer(false)}
-              className="mx-auto mb-4 block h-1 w-10 rounded-full bg-white/20"
-              aria-label="Close whisper"
+              onClick={() => setExpanded((v) => !v)}
+              className="mx-auto mb-3 block h-1 w-10 rounded-full bg-white/25"
+              aria-label={expanded ? "Collapse" : "Expand"}
             />
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -661,10 +687,28 @@ function StoryReel({ plan, onPick }: { plan: DatePlan; onPick: (m: Move) => void
               </span>
             </div>
 
-            {s.questions[0] && (
-              <p className="[font-family:var(--font-serif)] mb-4 text-lg italic leading-snug text-balance">
-                “{s.questions[0].text}”
-              </p>
+            {expanded ? (
+              <div className="mb-4">
+                <p className="[font-family:var(--font-mono)] mb-2 text-[9px] font-bold uppercase tracking-widest text-white/40">
+                  Things to ask
+                </p>
+                <ul className="space-y-2">
+                  {s.questions.map((q) => (
+                    <li
+                      key={q.text}
+                      className="[font-family:var(--font-serif)] text-base italic leading-snug text-white/90"
+                    >
+                      “{q.text}”
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              s.questions[0] && (
+                <p className="[font-family:var(--font-serif)] mb-4 text-lg italic leading-snug text-balance">
+                  “{s.questions[0].text}”
+                </p>
+              )
             )}
 
             <div className="grid grid-cols-2 gap-3">
@@ -697,8 +741,13 @@ function StoryReel({ plan, onPick }: { plan: DatePlan; onPick: (m: Move) => void
                 </button>
               )}
             </div>
+
+            {expanded && s.venue?.note && (
+              <p className="mt-3 text-xs text-white/60">💡 {s.venue.note}</p>
+            )}
+
             <p className="mt-3 text-center [font-family:var(--font-mono)] text-[9px] uppercase tracking-widest text-white/40">
-              Only you can see this · tap sides to move
+              {expanded ? "Only you can see this" : "Pull up for more · swipe sides to move"}
             </p>
           </div>
         )}
