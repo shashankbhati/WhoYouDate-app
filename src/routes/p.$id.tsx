@@ -1,10 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthState, openAuthModal } from "@/lib/auth";
 import { useDatePlanStore, venuesForCity, ensureCityVenues } from "@/lib/dateplan/store";
 import {
   loadSharedPlan,
   saveSharedSteps,
+  acceptSharedPlan,
+  postSharedMessage,
+  markOwnerSeen,
+  subscribeSharedPlan,
+  whoAmI,
   type SharedPlan,
   type SharedStep,
 } from "@/lib/dateplan/share";
@@ -20,7 +25,6 @@ function SharedPlanPage() {
   const { id } = Route.useParams();
   const { isReal, loading: authLoading } = useAuthState();
 
-  // ── Login gate (recipient must sign in — like needing the app to open a chat) ──
   if (!isReal) {
     return (
       <Shell>
@@ -28,8 +32,8 @@ function SharedPlanPage() {
           <p className="text-4xl">💌</p>
           <h1 className="mt-3 text-xl font-bold">Someone planned a date for you</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
-            Sign in to open the plan — you'll be able to see where you're going and tweak anything
-            you like.
+            Sign in to open the plan — you'll see where you're going and can tweak anything you
+            like.
           </p>
           <button
             onClick={() => openAuthModal("Sign in to open this date plan.")}
@@ -48,29 +52,38 @@ function SharedPlanPage() {
 }
 
 function SharedPlanView({ id }: { id: string }) {
-  const { venues } = useDatePlanStore();
+  useDatePlanStore(); // subscribe so alternatives re-render once this city's venues load
   const [plan, setPlan] = useState<SharedPlan | null>(null);
+  const [me, setMe] = useState<{ id: string; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [openSwap, setOpenSwap] = useState<number | null>(null);
+
+  const isOwner = !!plan && !!me && plan.ownerId === me.id;
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const p = await loadSharedPlan(id);
+      const [p, who] = await Promise.all([loadSharedPlan(id), whoAmI()]);
       if (!alive) return;
       setPlan(p);
+      setMe(who);
       setLoading(false);
-      if (p) ensureCityVenues(p.city); // load alternatives for swapping (auto-cities)
+      if (p) {
+        ensureCityVenues(p.city);
+        if (who && p.ownerId === who.id) markOwnerSeen(id); // clear owner's "new update" flag
+      }
     })();
+    // Live updates from the other side (edits, messages, accept).
+    const unsub = subscribeSharedPlan(id, (fresh) => {
+      if (alive) setPlan(fresh);
+    });
     return () => {
       alive = false;
+      unsub();
     };
   }, [id]);
 
-  // `venues` is a trigger: recompute alternatives once the store finishes loading
-  // this city's venues (venuesForCity reads module state, not the array directly).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const cityVenues = useMemo(() => (plan ? venuesForCity(plan.city) : []), [plan, venues]);
+  const cityVenues = plan ? venuesForCity(plan.city) : [];
 
   async function swap(stepOrder: number, v: Venue) {
     if (!plan) return;
@@ -84,10 +97,18 @@ function SharedPlanView({ id }: { id: string }) {
         venue: { id: v.id, name: v.name, kind: v.kind, area: v.area, rating: v.rating },
       };
     });
-    setPlan({ ...plan, steps });
+    setPlan({ ...plan, steps, status: "changed" });
     setOpenSwap(null);
-    const ok = await saveSharedSteps(id, steps);
+    const ok = await saveSharedSteps(id, steps, me?.name ?? "Your date");
     if (!ok) toast.error("Couldn't save the change — try again.");
+  }
+
+  async function accept() {
+    if (!plan) return;
+    setPlan({ ...plan, status: "accepted" });
+    const ok = await acceptSharedPlan(id);
+    if (ok) toast.success("Plan accepted 💗");
+    else toast.error("Couldn't save — try again.");
   }
 
   if (loading) {
@@ -111,18 +132,24 @@ function SharedPlanView({ id }: { id: string }) {
 
   return (
     <Shell>
-      <div className="text-center mb-6">
+      <div className="text-center mb-5">
         <p className="text-3xl">💌</p>
         <h1 className="mt-2 text-2xl font-bold">
-          {plan.ownerName ? `${plan.ownerName} planned a date` : "A date, planned for you"}
+          {isOwner
+            ? "Your shared plan"
+            : plan.ownerName
+              ? `${plan.ownerName} planned a date`
+              : "A date, planned for you"}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
           in {plan.city} · tweak anything you like
         </p>
       </div>
 
+      <StatusStrip plan={plan} isOwner={isOwner} />
+
       {plan.weatherBanner && (
-        <p className="text-sm rounded-xl bg-muted px-3 py-2 mb-5 text-center">
+        <p className="text-sm rounded-xl bg-muted px-3 py-2 my-5 text-center">
           {plan.weatherBanner}
         </p>
       )}
@@ -191,13 +218,126 @@ function SharedPlanView({ id }: { id: string }) {
         })}
       </ol>
 
-      <p className="mt-8 text-center text-xs text-muted-foreground">
+      {/* Accept (recipient only, until accepted) */}
+      {!isOwner && plan.status !== "accepted" && (
+        <button
+          onClick={accept}
+          className="mt-6 w-full rounded-full bg-primary text-primary-foreground py-3 font-semibold hover:opacity-90 transition"
+        >
+          💗 Accept this plan
+        </button>
+      )}
+
+      <MessageThread
+        plan={plan}
+        isOwner={isOwner}
+        onPosted={(msgs) => setPlan({ ...plan, messages: msgs })}
+        id={id}
+      />
+
+      <p className="mt-6 text-center text-xs text-muted-foreground">
         Want to plan your own?{" "}
         <Link to="/plan" className="text-primary hover:underline">
           Make a date plan →
         </Link>
       </p>
     </Shell>
+  );
+}
+
+function StatusStrip({ plan, isOwner }: { plan: SharedPlan; isOwner: boolean }) {
+  const label =
+    plan.status === "accepted"
+      ? `💗 ${plan.lastActor ?? "Your date"} accepted the plan`
+      : plan.status === "changed"
+        ? `✏️ ${plan.lastActor ?? "Someone"} tweaked the plan`
+        : isOwner
+          ? "⏳ Waiting for your date to open it"
+          : "Take a look — change anything you like";
+  const tone =
+    plan.status === "accepted"
+      ? "border-primary/40 bg-primary/10 text-foreground"
+      : plan.status === "changed"
+        ? "border-amber-500/40 bg-amber-500/10 text-foreground"
+        : "border-border bg-card text-muted-foreground";
+  return <div className={`rounded-xl border px-4 py-2.5 text-sm text-center ${tone}`}>{label}</div>;
+}
+
+function MessageThread({
+  plan,
+  isOwner,
+  onPosted,
+  id,
+}: {
+  plan: SharedPlan;
+  isOwner: boolean;
+  onPosted: (m: SharedPlan["messages"]) => void;
+  id: string;
+}) {
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "nearest" });
+  }, [plan.messages.length]);
+
+  async function send() {
+    const t = text.trim();
+    if (!t || sending) return;
+    setSending(true);
+    const msgs = await postSharedMessage(id, t, isOwner);
+    setSending(false);
+    if (msgs) {
+      onPosted(msgs);
+      setText("");
+    } else toast.error("Couldn't send — try again.");
+  }
+
+  return (
+    <div className="mt-8 rounded-2xl border border-border bg-card p-4">
+      <p className="text-sm font-bold mb-3">Chat about it</p>
+      {plan.messages.length === 0 ? (
+        <p className="text-xs text-muted-foreground mb-3">
+          No messages yet — say hi or ask about a spot.
+        </p>
+      ) : (
+        <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
+          {plan.messages.map((m, i) => {
+            const mine = m.owner === isOwner;
+            return (
+              <div key={i} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${mine ? "bg-primary text-primary-foreground" : "bg-muted"}`}
+                >
+                  {!mine && (
+                    <p className="text-[10px] font-semibold opacity-70 mb-0.5">{m.actor}</p>
+                  )}
+                  {m.text}
+                </div>
+              </div>
+            );
+          })}
+          <div ref={endRef} />
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && send()}
+          placeholder="Message…"
+          className="flex-1 rounded-full bg-input border border-border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+        />
+        <button
+          onClick={send}
+          disabled={sending || !text.trim()}
+          className="shrink-0 rounded-full bg-primary text-primary-foreground px-4 font-semibold hover:opacity-90 transition disabled:opacity-50"
+        >
+          Send
+        </button>
+      </div>
+    </div>
   );
 }
 

@@ -45,7 +45,10 @@ export async function signInWithGoogle() {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+      // Return to the exact page the user was on (e.g. a shared /p/:id link),
+      // not the home page. Requires the Supabase redirect allowlist to include a
+      // wildcard for the site (e.g. https://www.whoamidating.singles/**).
+      redirectTo: typeof window !== "undefined" ? window.location.href : undefined,
     },
   });
   if (error) throw error;
@@ -71,7 +74,9 @@ export function useAuthState() {
   useEffect(() => {
     const listener = () => force((n) => n + 1);
     listeners.add(listener);
-    return () => { listeners.delete(listener); };
+    return () => {
+      listeners.delete(listener);
+    };
   }, []);
   return {
     user: _user,
