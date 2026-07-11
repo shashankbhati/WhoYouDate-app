@@ -34,16 +34,24 @@ export function InstallPrompt() {
   const [show, setShow] = useState(false);
   const [os, setOs] = useState<"ios" | "android" | "other">("other");
   const [hasPrompt, setHasPrompt] = useState(false);
+  const [dbg, setDbg] = useState("");
+  const [debug] = useState(
+    () => typeof window !== "undefined" && /[?&]debugpwa/.test(window.location.search),
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const nav = window.navigator as Navigator & { standalone?: boolean };
-    if (window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true) return; // running installed
-    if (snoozedThisLoad) return; // "maybe later" tapped this load
-
+    const mm = window.matchMedia("(display-mode: standalone)").matches;
+    const ns = nav.standalone === true;
     const ua = navigator.userAgent;
     const o = /iphone|ipad|ipod/i.test(ua) ? "ios" : /android/i.test(ua) ? "android" : "other";
     setOs(o);
+    setDbg(`os:${o} mm:${mm} nav:${ns} snoozed:${snoozedThisLoad} dp:${!!deferredPrompt}`);
+
+    if (mm || ns) return; // running installed
+    if (snoozedThisLoad) return; // "maybe later" tapped this load
+
     if (deferredPrompt) setHasPrompt(true);
 
     const onInstallable = () => {
@@ -53,11 +61,11 @@ export function InstallPrompt() {
     };
     window.addEventListener("wad:installable", onInstallable);
 
-    // Show after a moment: if we can prompt (any platform) or on any phone.
+    // Show shortly after load: if we can prompt (any platform) or on any phone.
     const t = setTimeout(() => {
       if (snoozedThisLoad) return;
       if (deferredPrompt || o === "ios" || o === "android") setShow(true);
-    }, 2000);
+    }, 900);
 
     return () => {
       clearTimeout(t);
@@ -78,13 +86,37 @@ export function InstallPrompt() {
     dismiss();
   }
 
-  if (!show) return null;
+  // Diagnostic badge — only with ?debugpwa in the URL. Rendered alongside the real
+  // banner so "Force show" actually exercises it, on a device we can't inspect.
+  const badge = debug ? (
+    <div
+      style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.5rem)" }}
+      className="fixed inset-x-2 z-[80] rounded-xl border border-yellow-400/60 bg-black/90 p-3 text-[11px] leading-relaxed text-yellow-300"
+    >
+      <p className="font-bold">PWA debug</p>
+      <p>{dbg}</p>
+      <p>
+        show:{String(show)} hasPrompt:{String(hasPrompt)}
+      </p>
+      <button
+        onClick={() => setShow(true)}
+        className="mt-2 rounded bg-yellow-400 px-3 py-1 font-bold text-black"
+      >
+        Force show banner
+      </button>
+      {show && <p className="mt-2 text-green-400">→ banner is rendering (see top)</p>}
+    </div>
+  ) : null;
+
+  if (!show) return badge;
 
   return (
-    <div
-      style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
-      className="fixed inset-x-3 z-[60] mx-auto max-w-md rounded-2xl border border-white/10 bg-[color:var(--color-reel-surface,#1a1a1e)] p-4 text-white shadow-2xl backdrop-blur"
-    >
+    <>
+      {badge}
+      <div
+        style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
+        className="fixed inset-x-3 z-[60] mx-auto max-w-md rounded-2xl border border-white/10 bg-[color:var(--color-reel-surface,#1a1a1e)] p-4 text-white shadow-2xl backdrop-blur"
+      >
       <div className="flex items-start gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[color:var(--color-reel-rose,#f43f5e)]/20 text-xl">
           📲
@@ -136,7 +168,8 @@ export function InstallPrompt() {
           ✕
         </button>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
