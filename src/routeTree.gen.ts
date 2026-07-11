@@ -18,6 +18,7 @@ import { Route as PlanAdminRouteImport } from './routes/plan-admin'
 import { Route as PlanRouteImport } from './routes/plan'
 import { Route as LogRouteImport } from './routes/log'
 import { Route as DemoRouteImport } from './routes/demo'
+import { Route as DatesRouteImport } from './routes/dates'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PIdRouteImport } from './routes/p.$id'
 
@@ -66,6 +67,11 @@ const DemoRoute = DemoRouteImport.update({
   path: '/demo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DatesRoute = DatesRouteImport.update({
+  id: '/dates',
+  path: '/dates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -79,6 +85,7 @@ const PIdRoute = PIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dates': typeof DatesRoute
   '/demo': typeof DemoRoute
   '/log': typeof LogRoute
   '/plan': typeof PlanRoute
@@ -92,6 +99,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dates': typeof DatesRoute
   '/demo': typeof DemoRoute
   '/log': typeof LogRoute
   '/plan': typeof PlanRoute
@@ -106,6 +114,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dates': typeof DatesRoute
   '/demo': typeof DemoRoute
   '/log': typeof LogRoute
   '/plan': typeof PlanRoute
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/dates'
     | '/demo'
     | '/log'
     | '/plan'
@@ -134,6 +144,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/dates'
     | '/demo'
     | '/log'
     | '/plan'
@@ -147,6 +158,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/dates'
     | '/demo'
     | '/log'
     | '/plan'
@@ -161,6 +173,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DatesRoute: typeof DatesRoute
   DemoRoute: typeof DemoRoute
   LogRoute: typeof LogRoute
   PlanRoute: typeof PlanRoute
@@ -238,6 +251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dates': {
+      id: '/dates'
+      path: '/dates'
+      fullPath: '/dates'
+      preLoaderRoute: typeof DatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -257,6 +277,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DatesRoute: DatesRoute,
   DemoRoute: DemoRoute,
   LogRoute: LogRoute,
   PlanRoute: PlanRoute,

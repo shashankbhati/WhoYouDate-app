@@ -42,6 +42,8 @@ export interface SharedPlan {
   lastActor?: string;
   updatedAt?: string;
   ownerSeenAt?: string;
+  recipientId?: string; // who opened the plan (the date), if a logged-in non-owner
+  recipientName?: string; // their chosen display name — for the owner's inbox
 }
 
 const MAX_MESSAGES = 30; // embedded thread cap — one row, never a chat table
@@ -178,12 +180,39 @@ function rowToShared(data: any): SharedPlan {
     lastActor: data.last_actor ?? undefined,
     updatedAt: data.updated_at ?? undefined,
     ownerSeenAt: data.owner_seen_at ?? undefined,
+    recipientId: data.recipient_id ?? undefined,
+    recipientName: data.recipient_name ?? undefined,
   };
 }
 
 export async function loadSharedPlan(id: string): Promise<SharedPlan | null> {
   const { data } = await supabase.from("shared_plans").select("*").eq("id", id).maybeSingle();
   return data ? rowToShared(data) : null;
+}
+
+// The owner's inbox: every plan they've shared, newest activity first.
+export async function listMySharedPlans(): Promise<SharedPlan[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase
+    .from("shared_plans")
+    .select("*")
+    .eq("owner_id", user.id)
+    .order("updated_at", { ascending: false });
+  return (data ?? []).map(rowToShared);
+}
+
+// Record who opened the plan (first logged-in non-owner viewer), so the owner's
+// inbox can show a name. Written once — never overwrites an existing recipient.
+// Ignores errors (e.g. the recipient columns not migrated yet).
+export async function markRecipient(id: string, userId: string, name: string): Promise<void> {
+  await supabase
+    .from("shared_plans")
+    .update({ recipient_id: userId, recipient_name: name })
+    .eq("id", id)
+    .is("recipient_id", null);
 }
 
 // Save an edit (e.g. a venue swap) + stamp who did it, so the other side sees it.

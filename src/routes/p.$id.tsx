@@ -8,6 +8,7 @@ import {
   acceptSharedPlan,
   postSharedMessage,
   markOwnerSeen,
+  markRecipient,
   subscribeSharedPlan,
   whoAmI,
   type SharedPlan,
@@ -23,11 +24,13 @@ export const Route = createFileRoute("/p/$id")({
 
 function SharedPlanPage() {
   const { id } = Route.useParams();
+  const { isReal, loading: authLoading } = useAuthState();
+  // Reading a shared plan requires a real login (the link is the capability, the
+  // login is the gate).
+  if (!isReal) return <SignInWall authLoading={authLoading} />;
   return <SharedPlanView id={id} />;
 }
 
-// Shown only if the plan can't be loaded while logged out — i.e. viewing still
-// needs a login (older project, before the public-read policy) or the link is dead.
 function SignInWall({ authLoading }: { authLoading: boolean }) {
   return (
     <Shell>
@@ -68,7 +71,14 @@ function SharedPlanView({ id }: { id: string }) {
       setLoading(false);
       if (p) {
         ensureCityVenues(p.city);
-        if (who && p.ownerId === who.id) markOwnerSeen(id); // clear owner's "new update" flag
+        if (who && p.ownerId === who.id) {
+          markOwnerSeen(id); // clear owner's "new update" flag
+        } else if (who && !p.recipientId) {
+          // First logged-in non-owner to open it → record who they are for the
+          // owner's inbox (written once, never overwritten).
+          markRecipient(id, who.id, who.name);
+          setPlan({ ...p, recipientId: who.id, recipientName: who.name });
+        }
       }
     })();
     // Live updates from the other side (edits, messages, accept).
