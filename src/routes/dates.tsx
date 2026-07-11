@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuthState, openAuthModal } from "@/lib/auth";
-import { useMySharedPlans } from "@/lib/dateplan/inbox";
+import { useStore } from "@/lib/datedata/store";
+import { useSharedInbox } from "@/lib/dateplan/inbox";
 import type { SharedPlan } from "@/lib/dateplan/share";
 
 export const Route = createFileRoute("/dates")({
   head: () => ({
     meta: [
-      { title: "Your shared dates | WhoAmIDating" },
+      { title: "Your dates | WhoAmIDating" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -28,18 +29,20 @@ function fmtDate(iso?: string): string {
 
 function MyDatesPage() {
   const { isReal } = useAuthState();
-  const plans = useMySharedPlans(isReal);
+  const { profile } = useStore();
+  const { sent, received } = useSharedInbox(isReal);
+  const myName = profile?.displayName ?? "";
 
   if (!isReal) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-16 text-center">
         <p className="text-4xl">💌</p>
-        <h1 className="mt-3 text-2xl font-bold">Your shared dates</h1>
+        <h1 className="mt-3 text-2xl font-bold">Your dates</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Sign in to see the dates you've planned and shared.
+          Sign in to see the dates you've planned and the ones shared with you.
         </p>
         <button
-          onClick={() => openAuthModal("Sign in to see your shared dates.")}
+          onClick={() => openAuthModal("Sign in to see your dates.")}
           className="mt-5 rounded-full bg-primary px-6 py-2.5 font-semibold text-primary-foreground transition hover:opacity-90"
         >
           Sign in
@@ -48,19 +51,21 @@ function MyDatesPage() {
     );
   }
 
+  const empty = sent.length === 0 && received.length === 0;
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-2xl font-bold tracking-tight">Your shared dates</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Your dates</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Everyone you've sent a plan to — and where it stands.
+        Plans you've shared and plans shared with you — open one to see it and chat.
       </p>
 
-      {plans.length === 0 ? (
+      {empty ? (
         <div className="mt-8 rounded-2xl border border-border bg-card p-8 text-center">
           <p className="text-3xl">💌</p>
-          <p className="mt-3 font-semibold">No shared dates yet</p>
+          <p className="mt-3 font-semibold">Nothing here yet</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Plan a date and hit Share — it'll show up here.
+            Plan a date and hit Share — it'll show up here, and so will dates people share with you.
           </p>
           <Link
             to="/plan"
@@ -70,22 +75,53 @@ function MyDatesPage() {
           </Link>
         </div>
       ) : (
-        <ul className="mt-6 space-y-3">
-          {plans.map((p) => (
-            <DateRow key={p.id} p={p} />
-          ))}
-        </ul>
+        <div className="mt-6 space-y-8">
+          {received.length > 0 && (
+            <Section title="Shared with you" plans={received} mine={false} myName={myName} />
+          )}
+          {sent.length > 0 && (
+            <Section title="You shared" plans={sent} mine={true} myName={myName} />
+          )}
+        </div>
       )}
     </main>
   );
 }
 
-function DateRow({ p }: { p: SharedPlan }) {
-  const who = p.recipientName || (p.status === "pending" ? "Not opened yet" : "Your date");
+function Section({
+  title,
+  plans,
+  mine,
+  myName,
+}: {
+  title: string;
+  plans: SharedPlan[];
+  mine: boolean;
+  myName: string;
+}) {
+  return (
+    <section>
+      <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+        {title}
+      </h2>
+      <ul className="space-y-3">
+        {plans.map((p) => (
+          <DateRow key={p.id} p={p} mine={mine} myName={myName} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function DateRow({ p, mine, myName }: { p: SharedPlan; mine: boolean; myName: string }) {
+  const who = mine
+    ? p.recipientName || (p.status === "pending" ? "Not opened yet" : "Your date")
+    : p.ownerName || "Someone";
+  const seenAt = mine ? p.ownerSeenAt : p.recipientSeenAt;
   const unread =
     !!p.updatedAt &&
-    (!p.ownerSeenAt || +new Date(p.updatedAt) > +new Date(p.ownerSeenAt)) &&
-    p.lastActor !== p.ownerName;
+    (!seenAt || +new Date(p.updatedAt) > +new Date(seenAt)) &&
+    p.lastActor !== myName;
   const statusMeta =
     p.status === "accepted"
       ? { label: "Accepted", cls: "border-primary/40 bg-primary/10 text-primary" }

@@ -5,7 +5,7 @@ import { useAuthState, openAuthModal, signOut } from "@/lib/auth";
 import { useStore, getUserId } from "@/lib/datedata/store";
 import { useCountry } from "@/lib/country";
 import { buildNotifications, type Notif } from "@/lib/datedata/notifications";
-import { useMySharedPlans, sharedPlanNotifications } from "@/lib/dateplan/inbox";
+import { useSharedInbox, sharedPlanNotifications } from "@/lib/dateplan/inbox";
 
 const NOTIF_TS_KEY = "wad_notif_ts";
 
@@ -40,16 +40,17 @@ export function Header() {
   const myId = typeof window !== "undefined" ? getUserId() : "";
   const [lastSeen, setLastSeen] = useState(() => getLastSeen());
 
-  // Shared-date activity (accepted / edited / new message) → into the same bell.
-  const myPlans = useMySharedPlans(isReal);
-  const notifs = useMemo(
-    () =>
-      [
-        ...sharedPlanNotifications(myPlans, profile?.displayName ?? ""),
-        ...buildNotifications(entries, posts, myId, config.currencySymbol),
-      ].sort((a, b) => b.ts - a.ts),
-    [myPlans, profile?.displayName, entries, posts, myId, config.currencySymbol]
-  );
+  // Shared-date activity (accepted / edited / new message), sent + received, into
+  // the same bell.
+  const { sent, received } = useSharedInbox(isReal);
+  const notifs = useMemo(() => {
+    const name = profile?.displayName ?? "";
+    return [
+      ...sharedPlanNotifications(sent, true, name),
+      ...sharedPlanNotifications(received, false, name),
+      ...buildNotifications(entries, posts, myId, config.currencySymbol),
+    ].sort((a, b) => b.ts - a.ts);
+  }, [sent, received, profile?.displayName, entries, posts, myId, config.currencySymbol]);
   const unreadCount = notifs.filter((n) => n.countsUnread && n.ts > lastSeen).length;
 
   function openNotifs() {

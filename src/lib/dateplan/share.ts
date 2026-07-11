@@ -44,6 +44,7 @@ export interface SharedPlan {
   ownerSeenAt?: string;
   recipientId?: string; // who opened the plan (the date), if a logged-in non-owner
   recipientName?: string; // their chosen display name — for the owner's inbox
+  recipientSeenAt?: string; // recipient's "seen" stamp — powers their unread dot
 }
 
 const MAX_MESSAGES = 30; // embedded thread cap — one row, never a chat table
@@ -182,6 +183,7 @@ function rowToShared(data: any): SharedPlan {
     ownerSeenAt: data.owner_seen_at ?? undefined,
     recipientId: data.recipient_id ?? undefined,
     recipientName: data.recipient_name ?? undefined,
+    recipientSeenAt: data.recipient_seen_at ?? undefined,
   };
 }
 
@@ -204,6 +206,20 @@ export async function listMySharedPlans(): Promise<SharedPlan[]> {
   return (data ?? []).map(rowToShared);
 }
 
+// The recipient's inbox: plans shared WITH me (that I've opened), newest first.
+export async function listReceivedSharedPlans(): Promise<SharedPlan[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase
+    .from("shared_plans")
+    .select("*")
+    .eq("recipient_id", user.id)
+    .order("updated_at", { ascending: false });
+  return (data ?? []).map(rowToShared);
+}
+
 // Record who opened the plan (first logged-in non-owner viewer), so the owner's
 // inbox can show a name. Written once — never overwrites an existing recipient.
 // Ignores errors (e.g. the recipient columns not migrated yet).
@@ -213,6 +229,14 @@ export async function markRecipient(id: string, userId: string, name: string): P
     .update({ recipient_id: userId, recipient_name: name })
     .eq("id", id)
     .is("recipient_id", null);
+}
+
+// Recipient opened the plan → clear their "new update" indicator.
+export async function markRecipientSeen(id: string): Promise<void> {
+  await supabase
+    .from("shared_plans")
+    .update({ recipient_seen_at: new Date().toISOString() })
+    .eq("id", id);
 }
 
 // Save an edit (e.g. a venue swap) + stamp who did it, so the other side sees it.

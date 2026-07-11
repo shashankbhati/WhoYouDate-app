@@ -9,6 +9,7 @@ import {
   postSharedMessage,
   markOwnerSeen,
   markRecipient,
+  markRecipientSeen,
   subscribeSharedPlan,
   whoAmI,
   type SharedPlan,
@@ -73,11 +74,14 @@ function SharedPlanView({ id }: { id: string }) {
         ensureCityVenues(p.city);
         if (who && p.ownerId === who.id) {
           markOwnerSeen(id); // clear owner's "new update" flag
-        } else if (who && !p.recipientId) {
-          // First logged-in non-owner to open it → record who they are for the
-          // owner's inbox (written once, never overwritten).
-          markRecipient(id, who.id, who.name);
-          setPlan({ ...p, recipientId: who.id, recipientName: who.name });
+        } else if (who) {
+          // A logged-in non-owner opened it. Record who they are for the owner's
+          // inbox (written once), and clear their own "new update" flag.
+          if (!p.recipientId) {
+            markRecipient(id, who.id, who.name);
+            setPlan({ ...p, recipientId: who.id, recipientName: who.name });
+          }
+          markRecipientSeen(id);
         }
       }
     })();
