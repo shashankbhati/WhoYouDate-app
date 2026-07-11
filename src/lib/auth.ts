@@ -64,6 +64,13 @@ export async function signInWithEmailPassword(email: string, password: string) {
   if (error) throw error;
 }
 
+// Set a new password for the logged-in user (email/password accounts). We never
+// read or display a password — it's stored only as a one-way hash.
+export async function updatePassword(newPassword: string) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+}
+
 export async function signOut() {
   await supabase.auth.signOut();
   await supabase.auth.signInAnonymously();

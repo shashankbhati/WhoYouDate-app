@@ -3,7 +3,8 @@ import { useMemo, useState } from "react";
 import { useStore, saveProfile, getUserId } from "@/lib/datedata/store";
 import { ACTIVITY_META, type AgeRange, type Profile } from "@/lib/datedata/types";
 import { BADGES, earnedBadges } from "@/lib/datedata/badges";
-import { Settings, Share2, Check, ExternalLink } from "lucide-react";
+import { useAuthState, openAuthModal, updatePassword } from "@/lib/auth";
+import { Settings, Share2, Check, ExternalLink, Mail, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/profile")({
@@ -148,6 +149,8 @@ function ProfilePage() {
             </div>
           </div>
 
+          <AccountCard />
+
           <div className="rounded-2xl border border-border bg-card p-6">
             <h3 className="font-bold mb-4">Badge Collection</h3>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -193,6 +196,108 @@ function ProfilePage() {
         </aside>
       </div>
     </main>
+  );
+}
+
+function AccountCard() {
+  const { user, isReal } = useAuthState();
+  const [open, setOpen] = useState(false);
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  if (!isReal || !user) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <h3 className="font-bold mb-2">Account</h3>
+        <p className="text-sm text-muted-foreground">
+          You're browsing anonymously — sign in to see your login and secure your data across devices.
+        </p>
+        <button
+          onClick={() => openAuthModal("Sign in to your account.")}
+          className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+        >
+          Sign in
+        </button>
+      </div>
+    );
+  }
+
+  const provider = (user.app_metadata?.provider as string | undefined) ?? "email";
+  const isGoogle = provider === "google";
+
+  async function changePassword() {
+    if (pw.length < 6) return toast.error("Password must be at least 6 characters.");
+    setBusy(true);
+    try {
+      await updatePassword(pw);
+      toast.success("Password updated ✅");
+      setPw("");
+      setOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update the password.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6">
+      <h3 className="font-bold mb-4">Account</h3>
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
+          <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
+            <Mail className="h-4 w-4" /> Email
+          </span>
+          <span className="truncate font-medium">{user.email}</span>
+        </div>
+        <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
+          <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
+            <KeyRound className="h-4 w-4" /> Sign-in
+          </span>
+          <span className="font-medium">{isGoogle ? "Google" : "Email & password"}</span>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        {isGoogle ? (
+          <p className="text-xs text-muted-foreground">
+            You sign in with Google, so there's no separate password here — manage it in your Google
+            account.
+          </p>
+        ) : !open ? (
+          <button
+            onClick={() => setOpen(true)}
+            className="rounded-xl border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+          >
+            Change password
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              placeholder="New password"
+              autoComplete="new-password"
+              className="flex-1 rounded-lg border border-border bg-input px-3 py-2 text-sm"
+            />
+            <button
+              onClick={changePassword}
+              disabled={busy}
+              className="rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+            >
+              {busy ? "…" : "Update"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <p className="mt-4 text-[11px] text-muted-foreground">
+        🔒 We can never show your password — it's stored only as a secure one-way hash, so nobody
+        (not even us) can read it.
+      </p>
+    </div>
   );
 }
 
