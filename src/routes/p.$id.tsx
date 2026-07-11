@@ -175,6 +175,23 @@ const REEL_BGS = [
   "linear-gradient(160deg, oklch(0.3 0.09 350), oklch(0.16 0.04 300))",
 ];
 
+// A warm one-line "vibe" for the recipient, set by the stop type. Deterministic —
+// never reveals the planner's private prep, always fits.
+const VIBES: Record<string, string> = {
+  cafe: "Easy and unhurried — the warm-up.",
+  bar: "This is where the night loosens up.",
+  restaurant: "Sit down, settle in, actually talk.",
+  dessert: "The sweet little finish.",
+  activity: "Something to do together — and laugh about.",
+  walk: "Fresh air, no pressure, room to wander.",
+  park: "Green and calm, room to breathe.",
+  view: "Worth the little climb. A moment to just pause.",
+};
+function vibeFor(s: SharedStep): string | null {
+  const k = s.venue?.kind;
+  return k ? (VIBES[k] ?? null) : null;
+}
+
 function SharedReelScreen({
   plan,
   isReal,
@@ -345,6 +362,12 @@ function SharedChapter({
         </h3>
         <p className="mt-3 max-w-[28ch] text-sm text-white/70">{s.scene}</p>
 
+        {vibeFor(s) && (
+          <p className="[font-family:var(--font-serif)] mt-3 max-w-[26ch] text-lg italic leading-snug text-white/85">
+            {vibeFor(s)}
+          </p>
+        )}
+
         <div className="mt-4 flex flex-wrap gap-2">
           {s.venue?.rating != null && (
             <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
@@ -428,8 +451,17 @@ function SharedDetails({
       <h2 className="mt-2 text-2xl font-bold leading-tight tracking-tight text-balance">{heading}</h2>
       <p className="mt-1 text-sm text-white/60">
         {plan.city}
-        {plan.date ? ` · ${fmtDate(plan.date)}` : ""} · tweak anything you like
+        {plan.date ? ` · ${fmtDate(plan.date)}` : ""}
       </p>
+
+      {!isOwner && (
+        <p className="[font-family:var(--font-serif)] mt-4 text-xl italic leading-snug text-white/85 text-balance">
+          {plan.ownerName
+            ? `That's the date ${plan.ownerName} planned for you.`
+            : "That's your date, mapped out."}{" "}
+          Tweak anything you like, then say yes 💗.
+        </p>
+      )}
 
       <div className="mt-4">
         <StatusStrip plan={plan} isOwner={isOwner} />
