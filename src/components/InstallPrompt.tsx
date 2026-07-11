@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 
-// A dismissible "add to home screen" banner.
+// A "remind me later" add-to-home-screen banner.
 //   • Chrome/Edge (Android + desktop): captures the native install prompt → one-tap install.
 //   • iOS/Safari: Apple blocks programmatic install → show the manual Share hint.
 //   • Android without a captured prompt: show the menu hint so it's never a dead end.
+//
+// It hides only when the app is genuinely running installed (standalone). Dismissing
+// is a soft "maybe later": it snoozes for the current page view but re-appears on the
+// next full refresh — iOS gives websites no way to know it's already installed when
+// viewed in Safari, so we keep gently reminding until they open it from the icon.
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
-
-const DISMISS_KEY = "wad_pwa_dismissed";
 
 // Capture the install event as early as the module loads — Chrome often fires it
 // before React mounts, so listening only inside a component's effect misses it.
@@ -23,6 +26,10 @@ if (typeof window !== "undefined") {
   });
 }
 
+// Module-level, NOT persisted — so a soft dismiss lasts only for this page load
+// (survives in-app navigation, resets on a real browser refresh).
+let snoozedThisLoad = false;
+
 export function InstallPrompt() {
   const [show, setShow] = useState(false);
   const [os, setOs] = useState<"ios" | "android" | "other">("other");
@@ -31,8 +38,8 @@ export function InstallPrompt() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const nav = window.navigator as Navigator & { standalone?: boolean };
-    if (window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true) return; // installed
-    if (localStorage.getItem(DISMISS_KEY)) return; // dismissed before
+    if (window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true) return; // running installed
+    if (snoozedThisLoad) return; // "maybe later" tapped this load
 
     const ua = navigator.userAgent;
     const o = /iphone|ipad|ipod/i.test(ua) ? "ios" : /android/i.test(ua) ? "android" : "other";
@@ -40,6 +47,7 @@ export function InstallPrompt() {
     if (deferredPrompt) setHasPrompt(true);
 
     const onInstallable = () => {
+      if (snoozedThisLoad) return;
       setHasPrompt(true);
       setShow(true);
     };
@@ -47,6 +55,7 @@ export function InstallPrompt() {
 
     // Show after a moment: if we can prompt (any platform) or on any phone.
     const t = setTimeout(() => {
+      if (snoozedThisLoad) return;
       if (deferredPrompt || o === "ios" || o === "android") setShow(true);
     }, 2000);
 
@@ -57,12 +66,8 @@ export function InstallPrompt() {
   }, []);
 
   function dismiss() {
+    snoozedThisLoad = true; // soft: comes back on the next full refresh
     setShow(false);
-    try {
-      localStorage.setItem(DISMISS_KEY, "1");
-    } catch {
-      /* private mode */
-    }
   }
 
   async function install() {
@@ -103,14 +108,22 @@ export function InstallPrompt() {
               screen
             </p>
           )}
-          {hasPrompt && (
+          <div className="mt-2.5 flex items-center gap-3">
+            {hasPrompt && (
+              <button
+                onClick={install}
+                className="rounded-full bg-[color:var(--color-reel-rose,#f43f5e)] px-4 py-1.5 text-sm font-semibold text-neutral-950"
+              >
+                Add to home screen
+              </button>
+            )}
             <button
-              onClick={install}
-              className="mt-2.5 rounded-full bg-[color:var(--color-reel-rose,#f43f5e)] px-4 py-1.5 text-sm font-semibold text-neutral-950"
+              onClick={dismiss}
+              className="text-xs font-medium text-white/50 hover:text-white"
             >
-              Add to home screen
+              Maybe later
             </button>
-          )}
+          </div>
         </div>
         <button
           onClick={dismiss}
