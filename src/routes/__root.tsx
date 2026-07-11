@@ -75,6 +75,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             Go home
           </a>
         </div>
+        <details className="mt-6 text-left">
+          <summary className="cursor-pointer text-xs text-muted-foreground">Details</summary>
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-[11px] leading-snug text-foreground">
+            {error?.message}
+            {error?.stack ? `\n\n${error.stack}` : ""}
+          </pre>
+        </details>
       </div>
     </div>
   );
