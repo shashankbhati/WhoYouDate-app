@@ -23,33 +23,35 @@ export const Route = createFileRoute("/p/$id")({
 
 function SharedPlanPage() {
   const { id } = Route.useParams();
-  const { isReal, loading: authLoading } = useAuthState();
-
-  if (!isReal) {
-    return (
-      <Shell>
-        <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[color:var(--color-reel-surface)] p-8 text-center text-white">
-          <p className="text-4xl">💌</p>
-          <h1 className="mt-3 text-xl font-bold">Someone planned a date for you</h1>
-          <p className="mt-2 text-sm text-white/60">
-            Sign in to open the plan — you'll see where you're going and can tweak anything you like.
-          </p>
-          <button
-            onClick={() => openAuthModal("Sign in to open this date plan.")}
-            className="mt-5 rounded-full bg-[color:var(--color-reel-rose)] px-6 py-2.5 font-semibold text-neutral-950 transition hover:opacity-90"
-          >
-            Sign in to open
-          </button>
-          {authLoading && <p className="mt-3 text-xs text-white/40">Checking your session…</p>}
-        </div>
-      </Shell>
-    );
-  }
   return <SharedPlanView id={id} />;
+}
+
+// Shown only if the plan can't be loaded while logged out — i.e. viewing still
+// needs a login (older project, before the public-read policy) or the link is dead.
+function SignInWall({ authLoading }: { authLoading: boolean }) {
+  return (
+    <Shell>
+      <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[color:var(--color-reel-surface)] p-8 text-center text-white">
+        <p className="text-4xl">💌</p>
+        <h1 className="mt-3 text-xl font-bold">Someone planned a date for you</h1>
+        <p className="mt-2 text-sm text-white/60">
+          Sign in to open the plan — you'll see where you're going and can tweak anything you like.
+        </p>
+        <button
+          onClick={() => openAuthModal("Sign in to open this date plan.")}
+          className="mt-5 rounded-full bg-[color:var(--color-reel-rose)] px-6 py-2.5 font-semibold text-neutral-950 transition hover:opacity-90"
+        >
+          Sign in to open
+        </button>
+        {authLoading && <p className="mt-3 text-xs text-white/40">Checking your session…</p>}
+      </div>
+    </Shell>
+  );
 }
 
 function SharedPlanView({ id }: { id: string }) {
   useDatePlanStore(); // subscribe so alternatives re-render once this city's venues load
+  const { isReal, loading: authLoading } = useAuthState();
   const [plan, setPlan] = useState<SharedPlan | null>(null);
   const [me, setMe] = useState<{ id: string; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,11 +86,12 @@ function SharedPlanView({ id }: { id: string }) {
       unsub();
       clearInterval(poll);
     };
-  }, [id]);
+  }, [id, isReal]); // reload + re-identify after a sign-in
 
   const cityVenues = plan ? venuesForCity(plan.city) : [];
 
   async function swap(stepOrder: number, v: Venue) {
+    if (!isReal) return openAuthModal("Sign in to change this plan.");
     if (!plan) return;
     const steps: SharedStep[] = plan.steps.map((s) => {
       if (s.order !== stepOrder || !s.venue) return s;
@@ -106,6 +109,7 @@ function SharedPlanView({ id }: { id: string }) {
   }
 
   async function accept() {
+    if (!isReal) return openAuthModal("Sign in to accept this plan.");
     if (!plan) return;
     setPlan({ ...plan, status: "accepted" });
     const ok = await acceptSharedPlan(id);
@@ -121,6 +125,8 @@ function SharedPlanView({ id }: { id: string }) {
     );
   }
   if (!plan) {
+    // Logged out + nothing loaded → most likely viewing needs a login (or dead link).
+    if (!isReal) return <SignInWall authLoading={authLoading} />;
     return (
       <Shell>
         <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[color:var(--color-reel-surface)] p-8 text-center text-white">
@@ -135,6 +141,7 @@ function SharedPlanView({ id }: { id: string }) {
   return (
     <SharedReelScreen
       plan={plan}
+      isReal={isReal}
       isOwner={isOwner}
       cityVenues={cityVenues}
       onSwap={swap}
@@ -155,6 +162,7 @@ const REEL_BGS = [
 
 function SharedReelScreen({
   plan,
+  isReal,
   isOwner,
   cityVenues,
   onSwap,
@@ -163,6 +171,7 @@ function SharedReelScreen({
   id,
 }: {
   plan: SharedPlan;
+  isReal: boolean;
   isOwner: boolean;
   cityVenues: Venue[];
   onSwap: (order: number, v: Venue) => void;
@@ -258,6 +267,7 @@ function SharedReelScreen({
           {isDetails ? (
             <SharedDetails
               plan={plan}
+              isReal={isReal}
               isOwner={isOwner}
               heading={heading}
               onAccept={onAccept}
@@ -381,6 +391,7 @@ function SharedChapter({
 // The closing chapter for the recipient: date, status, accept, and chat.
 function SharedDetails({
   plan,
+  isReal,
   isOwner,
   heading,
   onAccept,
@@ -388,6 +399,7 @@ function SharedDetails({
   id,
 }: {
   plan: SharedPlan;
+  isReal: boolean;
   isOwner: boolean;
   heading: string;
   onAccept: () => void;
@@ -422,7 +434,7 @@ function SharedDetails({
         </button>
       )}
 
-      <MessageThread plan={plan} isOwner={isOwner} onPosted={onPosted} id={id} />
+      <MessageThread plan={plan} isReal={isReal} isOwner={isOwner} onPosted={onPosted} id={id} />
 
       <p className="mt-6 text-center text-xs text-white/50">
         Want to plan your own?{" "}
@@ -475,11 +487,13 @@ function StatusStrip({ plan, isOwner }: { plan: SharedPlan; isOwner: boolean }) 
 
 function MessageThread({
   plan,
+  isReal,
   isOwner,
   onPosted,
   id,
 }: {
   plan: SharedPlan;
+  isReal: boolean;
   isOwner: boolean;
   onPosted: (m: SharedPlan["messages"]) => void;
   id: string;
@@ -493,6 +507,7 @@ function MessageThread({
   }, [plan.messages.length]);
 
   async function send() {
+    if (!isReal) return openAuthModal("Sign in to chat about this plan.");
     const t = text.trim();
     if (!t || sending) return;
     setSending(true);

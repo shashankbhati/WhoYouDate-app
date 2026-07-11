@@ -46,13 +46,25 @@ export interface SharedPlan {
 
 const MAX_MESSAGES = 30; // embedded thread cap — one row, never a chat table
 
-// Who's viewing (id + best display name), for attributing edits/messages.
+// The name the user chose for themselves (their profile display name / username).
+async function displayNameFor(userId: string): Promise<string> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return (data?.display_name ?? "").toString().trim();
+}
+
+// Who's viewing (id + best display name), for attributing edits/messages. Prefer
+// the name they set in their profile, never the raw email.
 async function whoAmI(): Promise<{ id: string; name: string } | null> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
   const name =
+    (await displayNameFor(user.id)) ||
     (user.user_metadata?.full_name || user.user_metadata?.name || "").toString().trim() ||
     (user.email ? user.email.split("@")[0] : "Someone");
   return { id: user.id, name };
@@ -122,7 +134,9 @@ export async function sharePlan(
   if (existing) return { ok: true, url, reused: true };
 
   const ownerName =
-    (user.user_metadata?.full_name || user.user_metadata?.name || "").toString().trim() || null;
+    (await displayNameFor(user.id)) ||
+    (user.user_metadata?.full_name || user.user_metadata?.name || "").toString().trim() ||
+    null;
   // Include plan_date if the column exists; retry without it if the comms
   // migration hasn't been run yet, so sharing still works.
   const base = {
