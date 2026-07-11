@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Search, Menu, X, LogIn, LogOut, Bell } from "lucide-react";
+import { Search, Menu, X, LogIn, LogOut, Bell, RotateCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuthState, openAuthModal, signOut } from "@/lib/auth";
 import { useStore, getUserId } from "@/lib/datedata/store";
@@ -88,6 +88,16 @@ export function Header() {
           {/* Notification bell */}
           {myId && <NotifBell notifs={notifs} unreadCount={unreadCount} onOpen={openNotifs} />}
 
+          {/* Reload — the app (standalone PWA) has no address bar to refresh from */}
+          <button
+            onClick={() => window.location.reload()}
+            title="Reload"
+            aria-label="Reload"
+            className="p-1.5 rounded-md text-muted-foreground transition hover:text-foreground"
+          >
+            <RotateCw className="h-4 w-4" />
+          </button>
+
           {isReal ? (
             <div className="flex items-center gap-2 ml-2 pl-2 border-l border-border">
               <span className="text-xs font-semibold text-foreground">
@@ -111,9 +121,16 @@ export function Header() {
           )}
         </nav>
 
-        {/* Mobile: bell + Log CTA + hamburger */}
+        {/* Mobile: bell + reload + Log CTA + hamburger */}
         <div className="flex items-center gap-1.5 ml-auto md:hidden">
           {myId && <NotifBell notifs={notifs} unreadCount={unreadCount} onOpen={openNotifs} />}
+          <button
+            onClick={() => window.location.reload()}
+            aria-label="Reload"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground"
+          >
+            <RotateCw className="h-4 w-4" />
+          </button>
           <Link to="/log" className="rounded-full bg-primary text-primary-foreground text-xs font-bold px-3 py-1.5 hover:opacity-90 transition">
             + Log entry
           </Link>
