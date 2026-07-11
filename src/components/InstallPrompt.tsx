@@ -81,7 +81,10 @@ export function InstallPrompt() {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-x-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-[60] mx-auto max-w-md rounded-2xl border border-white/10 bg-[color:var(--color-reel-surface,#1a1a1e)] p-4 text-white shadow-2xl backdrop-blur">
+    <div
+      style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
+      className="fixed inset-x-3 z-[60] mx-auto max-w-md rounded-2xl border border-white/10 bg-[color:var(--color-reel-surface,#1a1a1e)] p-4 text-white shadow-2xl backdrop-blur"
+    >
       <div className="flex items-start gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[color:var(--color-reel-rose,#f43f5e)]/20 text-xl">
           📲
