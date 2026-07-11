@@ -45,9 +45,19 @@ export function InstallPrompt() {
     const mm = window.matchMedia("(display-mode: standalone)").matches;
     const ns = nav.standalone === true;
     const ua = navigator.userAgent;
-    const o = /iphone|ipad|ipod/i.test(ua) ? "ios" : /android/i.test(ua) ? "android" : "other";
+    // iPadOS (and iPhone with "Request Desktop Website") sends a Mac UA, so the
+    // text check misses it. A touch-capable "Mac" is really an iPad/iPhone —
+    // real Macs report maxTouchPoints 0.
+    const touchApple =
+      typeof navigator.maxTouchPoints === "number" &&
+      navigator.maxTouchPoints > 1 &&
+      /mac/i.test(ua);
+    const isIOS = /iphone|ipad|ipod/i.test(ua) || touchApple;
+    const o = isIOS ? "ios" : /android/i.test(ua) ? "android" : "other";
     setOs(o);
-    setDbg(`os:${o} mm:${mm} nav:${ns} snoozed:${snoozedThisLoad} dp:${!!deferredPrompt}`);
+    setDbg(
+      `os:${o} mm:${mm} nav:${ns} touch:${navigator.maxTouchPoints} snoozed:${snoozedThisLoad} dp:${!!deferredPrompt}`,
+    );
 
     if (mm || ns) return; // running installed
     if (snoozedThisLoad) return; // "maybe later" tapped this load
