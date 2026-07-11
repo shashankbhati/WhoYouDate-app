@@ -24,6 +24,7 @@ import {
   type RoadmapStop,
   type Move,
 } from "@/lib/dateplan/types";
+import { JourneyMap } from "@/components/JourneyMap";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/plan")({
@@ -672,7 +673,8 @@ function StoryReel({
             className="absolute inset-0 z-0"
             style={{ background: REEL_BGS[idx % REEL_BGS.length] }}
           />
-          <div className="absolute inset-x-0 bottom-0 z-0 h-2/3 bg-gradient-to-t from-[color:var(--color-reel-bg)] via-[color:var(--color-reel-bg)]/60 to-transparent" />
+          <JourneyMap total={total} idx={idx} />
+          <div className="absolute inset-x-0 bottom-0 z-[2] h-2/3 bg-gradient-to-t from-[color:var(--color-reel-bg)] via-[color:var(--color-reel-bg)]/60 to-transparent" />
 
           {/* Side tap zones (content sits above at z-20 and is pointer-events-none,
               so taps here still advance/rewind chapters). */}

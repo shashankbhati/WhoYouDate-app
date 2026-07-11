@@ -16,6 +16,7 @@ import {
   type SharedStep,
 } from "@/lib/dateplan/share";
 import type { Venue } from "@/lib/dateplan/types";
+import { JourneyMap } from "@/components/JourneyMap";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/p/$id")({
@@ -265,7 +266,8 @@ function SharedReelScreen({
             className="absolute inset-0 z-0"
             style={{ background: REEL_BGS[idx % REEL_BGS.length] }}
           />
-          <div className="absolute inset-x-0 bottom-0 z-0 h-2/3 bg-gradient-to-t from-[color:var(--color-reel-bg)] via-[color:var(--color-reel-bg)]/60 to-transparent" />
+          <JourneyMap total={total} idx={idx} />
+          <div className="absolute inset-x-0 bottom-0 z-[2] h-2/3 bg-gradient-to-t from-[color:var(--color-reel-bg)] via-[color:var(--color-reel-bg)]/50 to-transparent" />
 
           <button
             className="absolute left-0 top-0 z-10 h-full w-1/5"
