@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useStore } from "@/lib/datedata/store";
 import {
   useDatePlanStore,
@@ -193,46 +193,37 @@ function PlanPage() {
 
   if (mode === "reel" && plan) {
     return (
-      <main className="mx-auto max-w-[440px] px-4 py-8">
-        <button
-          type="button"
-          onClick={() => setMode("setup")}
-          className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← Edit details
-        </button>
-        <PlanView
-          plan={plan}
-          proof={cityProof}
-          onAnother={() => build(variant.current + 1)}
-          building={building}
-          input={{ partnerName: name, city, date, timeOfDay: tod, ageRange: age }}
-          shareKey={`${name}|${city}|${date}|${tod}|${age}|${budget}|${durationHours}|${variant.current}`}
-        />
-      </main>
+      <PlanScreen
+        plan={plan}
+        proof={cityProof}
+        onEdit={() => setMode("setup")}
+        onRecreate={() => build(variant.current + 1)}
+        building={building}
+        input={{ partnerName: name, city, date, timeOfDay: tod, ageRange: age }}
+        shareKey={`${name}|${city}|${date}|${tod}|${age}|${budget}|${durationHours}|${variant.current}`}
+      />
     );
   }
 
   return (
-    <main className="mx-auto max-w-[440px] px-4 py-8 [font-family:var(--font-sans)]">
-      {/* Header */}
-      <div className="mb-4 px-1">
-        <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-          New date · draft 01
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-balance">
-          Tell me the shape of it.
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">A few taps. I'll write the reel.</p>
+    <main className="min-h-screen bg-[color:var(--color-reel-bg)] px-4 pb-12 [font-family:var(--font-sans)]">
+      {/* Slim app bar — no website chrome on this screen, so keep a way home */}
+      <div className="mx-auto flex max-w-[440px] items-center justify-between pt-safe">
+        <Link
+          to="/"
+          className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium text-white/70 ring-1 ring-white/10 hover:text-white"
+        >
+          ‹ Home
+        </Link>
       </div>
 
-      {/* Cinematic setup card */}
+      {/* Cinematic setup card — everything lives inside the design */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           build(0);
         }}
-        className="relative overflow-hidden rounded-[32px] bg-[color:var(--color-reel-surface)] p-6 ring-1 ring-white/10 shadow-2xl"
+        className="relative mx-auto mt-4 max-w-[440px] overflow-hidden rounded-[32px] bg-[color:var(--color-reel-surface)] p-6 ring-1 ring-white/10 shadow-2xl"
       >
         <div
           className="pointer-events-none absolute inset-0 opacity-40"
@@ -242,6 +233,16 @@ function PlanPage() {
           }}
         />
         <div className="relative space-y-6 text-white">
+          {/* Header — now inside the design */}
+          <div>
+            <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.25em] text-white/40">
+              New date · draft 01
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-balance">
+              Tell me the shape of it.
+            </h1>
+            <p className="mt-1 text-sm text-white/60">A few taps. I'll write the reel.</p>
+          </div>
           {/* For + In */}
           <div className="grid grid-cols-[1fr_auto] items-end gap-3">
             <label className="block">
@@ -396,11 +397,11 @@ function PlanPage() {
       </form>
 
       {!hasCuratedTemplate(city) && (
-        <p className="mt-3 text-xs text-muted-foreground text-center">
+        <p className="mx-auto mt-3 max-w-[440px] text-center text-xs text-white/40">
           More cities are being added.{" "}
           <a
             href="mailto:hello@whoamidating.singles?subject=Add my city"
-            className="text-primary hover:underline"
+            className="text-[color:var(--color-reel-rose)] hover:underline"
           >
             Request yours →
           </a>
@@ -410,36 +411,41 @@ function PlanPage() {
   );
 }
 
-function PlanView({
+type Proof = { count: number; secondPct: number } | null;
+interface PlanInputMeta {
+  partnerName: string;
+  city: string;
+  date: string;
+  timeOfDay: TimeOfDay;
+  ageRange: AgeRange;
+}
+
+// Full-screen "app" surface for a built plan. Owns share + the chosen-move state,
+// and hands everything to the reel — which IS the screen.
+function PlanScreen({
   plan,
   proof,
-  onAnother,
+  onEdit,
+  onRecreate,
   building,
   input,
   shareKey,
 }: {
   plan: DatePlan;
-  proof: { count: number; secondPct: number } | null;
-  onAnother: () => void;
+  proof: Proof;
+  onEdit: () => void;
+  onRecreate: () => void;
   building: boolean;
-  input: {
-    partnerName: string;
-    city: string;
-    date: string;
-    timeOfDay: TimeOfDay;
-    ageRange: AgeRange;
-  };
+  input: PlanInputMeta;
   shareKey: string;
 }) {
   const [lastMove, setLastMove] = useState<Move | undefined>(undefined);
   const [sharing, setSharing] = useState(false);
-  const totalMin = plan.steps.reduce((a, s) => a + (s.type === "stop" ? s.minutes : 0), 0);
-  const hrs = Math.round((totalMin / 60) * 10) / 10;
 
-  async function share(p: DatePlan) {
+  async function share() {
     if (sharing) return;
     setSharing(true);
-    const res = await sharePlan(p, shareKey, input.date);
+    const res = await sharePlan(plan, shareKey, input.date);
     setSharing(false);
     if (res.error === "login") return openAuthModal("Sign in to share this plan with your date.");
     if (!res.ok || !res.url) return toast.error(res.error ?? "Couldn't create a share link.");
@@ -466,72 +472,108 @@ function PlanView({
   }
 
   return (
-    <section className="mt-8">
-      {/* Header meta */}
-      <div className="mb-3 flex items-end justify-between px-1">
-        <div>
-          <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            {plan.timeOfDay} · {plan.city}
-          </p>
-          <h2 className="mt-1 text-2xl font-bold tracking-tight">{plan.headline}</h2>
-        </div>
-      </div>
-
-      {plan.weatherBanner && (
-        <p className="text-sm rounded-xl bg-muted px-3 py-2 mb-3">{plan.weatherBanner}</p>
-      )}
-
-      {/* The story reel */}
-      <StoryReel plan={plan} onPick={setLastMove} />
-
-      {/* Stats */}
-      <div className="mt-4 flex flex-wrap gap-2 justify-center">
-        <Stat label="Duration" value={`~${hrs} hrs`} />
-        <Stat label="Est. cost" value={`~${fmtMoney(plan.totalCents, plan.currency)}`} />
-        {proof && <Stat label="2nd-date rate" value={`${proof.secondPct}%`} />}
-      </div>
-      {proof && (
-        <p className="mt-2 text-center text-xs text-muted-foreground">
-          📊 Built from{" "}
-          <span className="text-foreground font-semibold">{proof.count} real dates</span> in{" "}
-          {plan.city}.
-        </p>
-      )}
-
-      <div className="mt-5 grid sm:grid-cols-2 gap-3">
-        <button
-          onClick={onAnother}
-          disabled={building}
-          className="w-full rounded-full border border-primary text-primary py-2.5 font-semibold hover:bg-primary/10 transition disabled:opacity-60"
-        >
-          {building ? "Shuffling…" : "🔄 Try another plan"}
-        </button>
-        <button
-          onClick={() => share(plan)}
-          disabled={sharing}
-          className="w-full rounded-full bg-primary text-primary-foreground py-2.5 font-semibold hover:opacity-90 transition disabled:opacity-60"
-        >
-          {sharing ? "Preparing…" : "📤 Share with your date"}
-        </button>
-      </div>
-      <p className="mt-2 text-center text-xs text-muted-foreground">
-        They'll see the plan (and can tweak it) — but never your budget, prompts, or moves.
-      </p>
-
-      <ReviewCard input={input} lastMove={lastMove} />
-
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        Tip: log the date afterwards on your{" "}
-        <Link to="/log" className="text-primary hover:underline">
-          ledger
-        </Link>{" "}
-        to sharpen future plans.
-      </p>
-    </section>
+    <StoryReel
+      plan={plan}
+      proof={proof}
+      input={input}
+      onEdit={onEdit}
+      onRecreate={onRecreate}
+      onShare={share}
+      building={building}
+      sharing={sharing}
+      onPick={setLastMove}
+      lastMove={lastMove}
+    />
   );
 }
 
-// ── The Story Reel — each stop is a full-screen, swipeable "chapter" ──────────
+// ── Icon buttons (top bar) ────────────────────────────────────────────────────
+function IconChevronLeft() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      className="size-[18px]"
+    >
+      <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IconRecreate() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-[18px]">
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21 3v5h-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IconShareUp() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-[18px]">
+      <path d="M12 15V4M12 4l-4 4M12 4l4 4" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// A round icon button whose label appears on press-and-hold (like iOS).
+function IconBtn({
+  label,
+  onClick,
+  busy,
+  variant = "plain",
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  busy?: boolean;
+  variant?: "plain" | "rose";
+  children: ReactNode;
+}) {
+  const [showLabel, setShowLabel] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const start = () => {
+    timer.current = setTimeout(() => setShowLabel(true), 300);
+  };
+  const end = () => {
+    clearTimeout(timer.current);
+    setShowLabel(false);
+  };
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={onClick}
+        onPointerDown={start}
+        onPointerUp={end}
+        onPointerLeave={end}
+        onContextMenu={(e) => e.preventDefault()}
+        aria-label={label}
+        className={`grid size-9 place-items-center rounded-full ring-1 transition active:scale-95 ${
+          variant === "rose"
+            ? "bg-[color:var(--color-reel-rose)] text-neutral-950 ring-transparent"
+            : "bg-white/10 text-white ring-white/15 hover:bg-white/15"
+        } ${busy ? "opacity-70" : ""}`}
+      >
+        <span className={busy ? "block animate-spin" : "block"}>{children}</span>
+      </button>
+      {showLabel && (
+        <span className="pointer-events-none absolute right-0 top-full z-50 mt-1 whitespace-nowrap rounded-md bg-black/85 px-2 py-1 text-[10px] font-medium text-white">
+          {label}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── The Story Reel — the whole screen. Stops are swipeable chapters, ending on
+//    a "receipt" summary. Every bit of meta + every action lives inside. ───────
 const REEL_BGS = [
   "linear-gradient(160deg, oklch(0.35 0.12 30), oklch(0.18 0.05 285))",
   "linear-gradient(160deg, oklch(0.28 0.08 40), oklch(0.16 0.03 260))",
@@ -539,228 +581,368 @@ const REEL_BGS = [
   "linear-gradient(160deg, oklch(0.3 0.09 350), oklch(0.16 0.04 300))",
 ];
 
-function StoryReel({ plan, onPick }: { plan: DatePlan; onPick: (m: Move) => void }) {
+function StoryReel({
+  plan,
+  proof,
+  input,
+  onEdit,
+  onRecreate,
+  onShare,
+  building,
+  sharing,
+  onPick,
+  lastMove,
+}: {
+  plan: DatePlan;
+  proof: Proof;
+  input: PlanInputMeta;
+  onEdit: () => void;
+  onRecreate: () => void;
+  onShare: () => void;
+  building: boolean;
+  sharing: boolean;
+  onPick: (m: Move) => void;
+  lastMove?: Move;
+}) {
   const stops = plan.steps.filter((s): s is RoadmapStop => s.type === "stop");
+  const total = stops.length + 1; // stops + the receipt chapter
   const [idx, setIdx] = useState(0);
-  const [drawer, setDrawer] = useState(true);
-  const [expanded, setExpanded] = useState(false);
-  const [pick, setPick] = useState<"safe" | "risky" | null>(null);
   const touchX = useRef(0);
-  const touchY = useRef(0);
-  const s = stops[idx];
-  if (!s) return null;
 
-  const go = (i: number) => {
-    setIdx(Math.max(0, Math.min(stops.length - 1, i)));
-    setPick(null);
-    setDrawer(true);
-    setExpanded(false);
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const dx = e.changedTouches[0].clientX - touchX.current;
-    if (dx < -45) go(idx + 1);
-    else if (dx > 45) go(idx - 1);
-  };
-  const kind = s.title.split(" — ")[0];
-  const place = s.venue?.name ?? s.title;
-  const startTime = s.timeLabel?.split(" – ")[0] ?? "";
-  const cost = s.estCents === 0 ? "free" : `~${fmtMoney(s.estCents ?? 0, plan.currency)}`;
+  const isReceipt = idx >= stops.length;
+  const s = stops[idx];
+  const go = (i: number) => setIdx(Math.max(0, Math.min(total - 1, i)));
+
+  const title = input.partnerName.trim()
+    ? `${input.partnerName.trim()} · ${plan.city}`
+    : `${plan.timeOfDay} · ${plan.city}`;
+
+  const totalMin = plan.steps.reduce((a, st) => a + (st.type === "stop" ? st.minutes : 0), 0);
+  const hrs = Math.round((totalMin / 60) * 10) / 10;
 
   return (
-    <div className="[font-family:var(--font-sans)] text-white">
-      <div
-        onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
-        onTouchEnd={onTouchEnd}
-        className="relative mx-auto aspect-[9/16] w-full max-w-[380px] overflow-hidden rounded-[36px] bg-[color:var(--color-reel-bg)] shadow-2xl ring-1 ring-white/10"
-      >
-        {/* Chapter progress */}
-        <div className="absolute inset-x-4 top-4 z-30 flex gap-1.5">
-          {stops.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => go(i)}
-              className="h-1 flex-1 overflow-hidden rounded-full bg-white/15"
-              aria-label={`Chapter ${i + 1}`}
-            >
-              <span
-                className={`block h-full rounded-full ${i <= idx ? "w-full bg-white" : "w-0"}`}
-              />
-            </button>
-          ))}
-        </div>
-
-        {/* Background */}
-        <div
-          className="absolute inset-0 z-0"
-          style={{ background: REEL_BGS[idx % REEL_BGS.length] }}
-        />
-        <div className="absolute inset-x-0 bottom-0 z-0 h-2/3 bg-gradient-to-t from-[color:var(--color-reel-bg)] via-[color:var(--color-reel-bg)]/60 to-transparent" />
-
-        {/* Tap zones */}
-        <button
-          className="absolute left-0 top-0 z-10 h-full w-1/3"
-          aria-label="Previous"
-          onClick={() => go(idx - 1)}
-        />
-        <button
-          className="absolute right-0 top-0 z-10 h-full w-1/3"
-          aria-label="Next"
-          onClick={() => go(idx + 1)}
-        />
-
-        {/* Content */}
-        <div className="relative z-20 flex h-full flex-col p-6 pt-14">
-          <p className="[font-family:var(--font-mono)] text-[11px] uppercase tracking-[0.25em] text-white/60">
-            {s.emoji} Chapter {idx + 1} · {kind}
-          </p>
-          {startTime && (
-            <span className="[font-family:var(--font-display)] mt-2 text-6xl font-extrabold leading-none tracking-tight text-white/90">
-              {startTime}
-            </span>
-          )}
-          <h3 className="mt-3 text-3xl font-semibold leading-[1.05] tracking-tight text-balance">
-            {place}
-          </h3>
-          <p className="mt-3 max-w-[28ch] text-sm text-white/70">{s.scene}</p>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {s.venue?.rating != null && (
-              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
-                ★ {s.venue.rating.toFixed(1)}
-              </span>
-            )}
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
-              {cost}
-            </span>
-            {s.venue?.area && (
-              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
-                📍 {s.venue.area}
-              </span>
-            )}
-          </div>
-
-          {s.weatherNote && <p className="mt-3 text-[11px] text-white/60">{s.weatherNote}</p>}
-
-          <div className="mt-auto">
-            {!drawer && (
-              <button
-                onClick={() => setDrawer(true)}
-                className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium backdrop-blur"
-              >
-                <span className="size-1.5 rounded-full bg-[color:var(--color-reel-rose)]" /> Open
-                whisper
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Whisper drawer — the private layer (only the planner sees this).
-            Pull up (swipe up / tap the handle) to reveal every prompt + a tip. */}
-        {drawer && (
-          <div
-            onTouchStart={(e) => {
-              e.stopPropagation();
-              touchY.current = e.touches[0].clientY;
-            }}
-            onTouchEnd={(e) => {
-              e.stopPropagation();
-              const dy = e.changedTouches[0].clientY - touchY.current;
-              if (dy < -30) setExpanded(true);
-              else if (dy > 30) setExpanded(false);
-            }}
-            className={`absolute inset-x-0 bottom-0 z-30 rounded-t-3xl bg-[color:var(--color-reel-surface)] px-5 pb-6 pt-2 ring-1 ring-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.5)] ${expanded ? "max-h-[86%] overflow-y-auto" : ""}`}
-          >
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="mx-auto mb-3 block h-1 w-10 rounded-full bg-white/25"
-              aria-label={expanded ? "Collapse" : "Expand"}
-            />
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="size-1.5 rounded-full bg-[color:var(--color-reel-rose)]" />
-                <p className="[font-family:var(--font-mono)] text-[10px] font-bold uppercase tracking-[0.25em] text-white/60">
-                  Whisper · only you
-                </p>
-              </div>
-              <span className="[font-family:var(--font-mono)] text-[10px] text-white/40">
-                {idx + 1}/{stops.length}
-              </span>
-            </div>
-
-            {expanded ? (
-              <div className="mb-4">
-                <p className="[font-family:var(--font-mono)] mb-2 text-[9px] font-bold uppercase tracking-widest text-white/40">
-                  Things to ask
-                </p>
-                <ul className="space-y-2">
-                  {s.questions.map((q) => (
-                    <li
-                      key={q.text}
-                      className="[font-family:var(--font-serif)] text-base italic leading-snug text-white/90"
-                    >
-                      “{q.text}”
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              s.questions[0] && (
-                <p className="[font-family:var(--font-serif)] mb-4 text-lg italic leading-snug text-balance">
-                  “{s.questions[0].text}”
-                </p>
-              )
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              {s.safe && (
-                <button
-                  onClick={() => {
-                    setPick("safe");
-                    onPick(s.safe!);
-                  }}
-                  className={`-rotate-1 rounded-2xl border p-3 text-left transition ${pick === "safe" ? "border-white bg-white text-neutral-950" : "border-white/15 bg-white/[0.03] text-white/90"}`}
-                >
-                  <p className="[font-family:var(--font-mono)] text-[9px] font-bold uppercase tracking-widest opacity-70">
-                    Safe move
-                  </p>
-                  <p className="mt-1 text-xs leading-snug">{s.safe.label}</p>
-                </button>
-              )}
-              {s.risky && (
-                <button
-                  onClick={() => {
-                    setPick("risky");
-                    onPick(s.risky!);
-                  }}
-                  className={`rotate-1 rounded-2xl border p-3 text-left transition ${pick === "risky" ? "border-[color:var(--color-reel-rose)] bg-[color:var(--color-reel-rose)] text-neutral-950" : "border-[color:var(--color-reel-rose)]/40 bg-[color:var(--color-reel-rose-soft)]/40 text-[color:var(--color-reel-rose)]"}`}
-                >
-                  <p className="[font-family:var(--font-mono)] text-[9px] font-bold uppercase tracking-widest opacity-80">
-                    Risky move
-                  </p>
-                  <p className="mt-1 text-xs leading-snug">{s.risky.label}</p>
-                </button>
-              )}
-            </div>
-
-            {expanded && s.venue?.note && (
-              <p className="mt-3 text-xs text-white/60">💡 {s.venue.note}</p>
-            )}
-
-            <p className="mt-3 text-center [font-family:var(--font-mono)] text-[9px] uppercase tracking-widest text-white/40">
-              {expanded ? "Only you can see this" : "Pull up for more · swipe sides to move"}
+    <div className="fixed inset-0 z-40 flex justify-center bg-black [font-family:var(--font-sans)] text-white">
+      <div className="relative flex h-full w-full max-w-[430px] flex-col overflow-hidden bg-[color:var(--color-reel-bg)] shadow-2xl sm:my-auto sm:h-[min(920px,100svh)] sm:rounded-[40px] sm:ring-1 sm:ring-white/10">
+        {/* Top bar — actions collapsed into icons */}
+        <div className="relative z-40 px-4 pt-safe">
+          <div className="flex items-center gap-2 pb-2.5 pt-3">
+            <IconBtn label="Edit details" onClick={onEdit}>
+              <IconChevronLeft />
+            </IconBtn>
+            <p className="min-w-0 flex-1 truncate text-center text-xs font-semibold text-white/80">
+              {title}
             </p>
+            <IconBtn label="Recreate" onClick={onRecreate} busy={building}>
+              <IconRecreate />
+            </IconBtn>
+            <IconBtn label="Share with your date" onClick={onShare} busy={sharing} variant="rose">
+              <IconShareUp />
+            </IconBtn>
           </div>
-        )}
+          {/* Chapter progress */}
+          <div className="flex gap-1.5">
+            {Array.from({ length: total }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => go(i)}
+                className="h-1 flex-1 overflow-hidden rounded-full bg-white/15"
+                aria-label={`Chapter ${i + 1}`}
+              >
+                <span
+                  className={`block h-full rounded-full bg-white ${i <= idx ? "w-full" : "w-0"}`}
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Stage */}
+        <div
+          className="relative flex-1 overflow-hidden"
+          style={{ touchAction: "pan-y" }}
+          onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
+          onTouchEnd={(e) => {
+            const dx = e.changedTouches[0].clientX - touchX.current;
+            if (dx < -45) go(idx + 1);
+            else if (dx > 45) go(idx - 1);
+          }}
+        >
+          {/* Background */}
+          <div
+            className="absolute inset-0 z-0"
+            style={{ background: REEL_BGS[idx % REEL_BGS.length] }}
+          />
+          <div className="absolute inset-x-0 bottom-0 z-0 h-2/3 bg-gradient-to-t from-[color:var(--color-reel-bg)] via-[color:var(--color-reel-bg)]/60 to-transparent" />
+
+          {/* Side tap zones (content sits above at z-20 and is pointer-events-none,
+              so taps here still advance/rewind chapters). */}
+          <button
+            className="absolute left-0 top-0 z-10 h-full w-1/5"
+            aria-label="Previous"
+            onClick={() => go(idx - 1)}
+          />
+          <button
+            className="absolute right-0 top-0 z-10 h-full w-1/5"
+            aria-label="Next"
+            onClick={() => go(idx + 1)}
+          />
+
+          {isReceipt ? (
+            <Receipt
+              plan={plan}
+              proof={proof}
+              hrs={hrs}
+              input={input}
+              lastMove={lastMove}
+              onShare={onShare}
+              sharing={sharing}
+            />
+          ) : (
+            s && <ChapterStop key={idx} s={s} idx={idx} total={total} currency={plan.currency} onPick={onPick} />
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+// A single stop chapter + its private whisper drawer. Keyed by index so its
+// drawer/expanded/pick state resets cleanly on every chapter change.
+function ChapterStop({
+  s,
+  idx,
+  total,
+  currency,
+  onPick,
+}: {
+  s: RoadmapStop;
+  idx: number;
+  total: number;
+  currency: string;
+  onPick: (m: Move) => void;
+}) {
+  const [drawer, setDrawer] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const [pick, setPick] = useState<"safe" | "risky" | null>(null);
+  const touchY = useRef(0);
+
+  const kind = s.title.split(" — ")[0];
+  const place = s.venue?.name ?? s.title;
+  const startTime = s.timeLabel?.split(" – ")[0] ?? "";
+  const cost = s.estCents === 0 ? "free" : `~${fmtMoney(s.estCents ?? 0, currency)}`;
+
   return (
-    <div className="rounded-xl bg-card border border-border px-3 py-2">
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="text-base font-bold">{value}</div>
+    <>
+      {/* Content — pointer-events-none so the side tap zones stay tappable;
+          interactive children opt back in with pointer-events-auto. */}
+      <div className="pointer-events-none absolute inset-0 z-20 flex flex-col p-6">
+        <p className="[font-family:var(--font-mono)] text-[11px] uppercase tracking-[0.25em] text-white/60">
+          {s.emoji} Chapter {idx + 1} · {kind}
+        </p>
+        {startTime && (
+          <span className="[font-family:var(--font-display)] mt-2 text-6xl font-extrabold leading-none tracking-tight text-white/90">
+            {startTime}
+          </span>
+        )}
+        <h3 className="mt-3 text-3xl font-semibold leading-[1.05] tracking-tight text-balance">
+          {place}
+        </h3>
+        <p className="mt-3 max-w-[28ch] text-sm text-white/70">{s.scene}</p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {s.venue?.rating != null && (
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
+              ★ {s.venue.rating.toFixed(1)}
+            </span>
+          )}
+          <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
+            {cost}
+          </span>
+          {s.venue?.area && (
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
+              📍 {s.venue.area}
+            </span>
+          )}
+        </div>
+
+        {s.weatherNote && <p className="mt-3 text-[11px] text-white/60">{s.weatherNote}</p>}
+
+        <div className="mt-auto">
+          {!drawer && (
+            <button
+              onClick={() => setDrawer(true)}
+              className="pointer-events-auto mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium backdrop-blur"
+            >
+              <span className="size-1.5 rounded-full bg-[color:var(--color-reel-rose)]" /> Open whisper
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Whisper drawer — the private layer (only the planner sees this).
+          Pull up (swipe up / tap the handle) to reveal every prompt + a tip. */}
+      {drawer && (
+        <div
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            touchY.current = e.touches[0].clientY;
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            const dy = e.changedTouches[0].clientY - touchY.current;
+            if (dy < -30) setExpanded(true);
+            else if (dy > 30) setExpanded(false);
+          }}
+          className={`absolute inset-x-0 bottom-0 z-30 rounded-t-3xl bg-[color:var(--color-reel-surface)] px-5 pb-6 pt-2 ring-1 ring-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.5)] ${expanded ? "max-h-[86%] overflow-y-auto" : ""}`}
+        >
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="mx-auto mb-3 block h-1 w-10 rounded-full bg-white/25"
+            aria-label={expanded ? "Collapse" : "Expand"}
+          />
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="size-1.5 rounded-full bg-[color:var(--color-reel-rose)]" />
+              <p className="[font-family:var(--font-mono)] text-[10px] font-bold uppercase tracking-[0.25em] text-white/60">
+                Whisper · only you
+              </p>
+            </div>
+            <span className="[font-family:var(--font-mono)] text-[10px] text-white/40">
+              {idx + 1}/{total}
+            </span>
+          </div>
+
+          {expanded ? (
+            <div className="mb-4">
+              <p className="[font-family:var(--font-mono)] mb-2 text-[9px] font-bold uppercase tracking-widest text-white/40">
+                Things to ask
+              </p>
+              <ul className="space-y-2">
+                {s.questions.map((q) => (
+                  <li
+                    key={q.text}
+                    className="[font-family:var(--font-serif)] text-base italic leading-snug text-white/90"
+                  >
+                    “{q.text}”
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            s.questions[0] && (
+              <p className="[font-family:var(--font-serif)] mb-4 text-lg italic leading-snug text-balance">
+                “{s.questions[0].text}”
+              </p>
+            )
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            {s.safe && (
+              <button
+                onClick={() => {
+                  setPick("safe");
+                  onPick(s.safe!);
+                }}
+                className={`-rotate-1 rounded-2xl border p-3 text-left transition ${pick === "safe" ? "border-white bg-white text-neutral-950" : "border-white/15 bg-white/[0.03] text-white/90"}`}
+              >
+                <p className="[font-family:var(--font-mono)] text-[9px] font-bold uppercase tracking-widest opacity-70">
+                  Safe move
+                </p>
+                <p className="mt-1 text-xs leading-snug">{s.safe.label}</p>
+              </button>
+            )}
+            {s.risky && (
+              <button
+                onClick={() => {
+                  setPick("risky");
+                  onPick(s.risky!);
+                }}
+                className={`rotate-1 rounded-2xl border p-3 text-left transition ${pick === "risky" ? "border-[color:var(--color-reel-rose)] bg-[color:var(--color-reel-rose)] text-neutral-950" : "border-[color:var(--color-reel-rose)]/40 bg-[color:var(--color-reel-rose-soft)]/40 text-[color:var(--color-reel-rose)]"}`}
+              >
+                <p className="[font-family:var(--font-mono)] text-[9px] font-bold uppercase tracking-widest opacity-80">
+                  Risky move
+                </p>
+                <p className="mt-1 text-xs leading-snug">{s.risky.label}</p>
+              </button>
+            )}
+          </div>
+
+          {expanded && s.venue?.note && (
+            <p className="mt-3 text-xs text-white/60">💡 {s.venue.note}</p>
+          )}
+
+          <p className="mt-3 text-center [font-family:var(--font-mono)] text-[9px] uppercase tracking-widest text-white/40">
+            {expanded ? "Only you can see this" : "Pull up for more · swipe sides to move"}
+          </p>
+        </div>
+      )}
+    </>
+  );
+}
+
+// The closing chapter — the plan's "receipt": duration, cost, proof, share,
+// and a tucked-away post-date review.
+function Receipt({
+  plan,
+  proof,
+  hrs,
+  input,
+  lastMove,
+  onShare,
+  sharing,
+}: {
+  plan: DatePlan;
+  proof: Proof;
+  hrs: number;
+  input: PlanInputMeta;
+  lastMove?: Move;
+  onShare: () => void;
+  sharing: boolean;
+}) {
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col overflow-y-auto px-6 pb-8 pt-6">
+      <p className="[font-family:var(--font-mono)] text-[11px] uppercase tracking-[0.25em] text-white/60">
+        🧾 The receipt
+      </p>
+      <h3 className="mt-2 text-3xl font-semibold leading-tight tracking-tight text-balance">
+        {input.partnerName.trim() ? `You & ${input.partnerName.trim()}, mapped.` : "Your date, mapped."}
+      </h3>
+      <p className="mt-1 text-sm text-white/60">The whole evening, at a glance.</p>
+
+      <div className="mt-5 grid grid-cols-3 gap-2">
+        <ReceiptStat label="Duration" value={`~${hrs}h`} />
+        <ReceiptStat label="Est. cost" value={`~${fmtMoney(plan.totalCents, plan.currency)}`} />
+        <ReceiptStat label="2nd date" value={proof ? `${proof.secondPct}%` : "—"} />
+      </div>
+      {proof && (
+        <p className="mt-3 text-center text-xs text-white/50">
+          📊 Built from{" "}
+          <span className="font-semibold text-white/80">{proof.count} real dates</span> in{" "}
+          {plan.city}.
+        </p>
+      )}
+
+      <button
+        onClick={onShare}
+        disabled={sharing}
+        className="mt-5 w-full rounded-full bg-[color:var(--color-reel-rose)] py-3.5 font-semibold text-neutral-950 transition active:scale-[0.99] disabled:opacity-60"
+      >
+        {sharing ? "Preparing…" : "📤 Share with your date"}
+      </button>
+      <p className="mt-2 text-center text-[11px] text-white/40">
+        They'll see the plan (and can tweak it) — never your budget, prompts, or moves.
+      </p>
+
+      <ReviewCard input={input} lastMove={lastMove} />
+    </div>
+  );
+}
+
+function ReceiptStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-3 text-center">
+      <div className="text-[9px] uppercase tracking-wider text-white/40">{label}</div>
+      <div className="mt-0.5 text-lg font-bold">{value}</div>
     </div>
   );
 }

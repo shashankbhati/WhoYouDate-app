@@ -54,7 +54,7 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur pt-safe">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
         <Link to="/" className="flex items-center gap-2 shrink-0" onClick={() => setMobileOpen(false)}>
           <span className="font-bold tracking-tight text-foreground">whoamidating.singles</span>

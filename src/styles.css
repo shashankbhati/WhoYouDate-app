@@ -153,6 +153,17 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    /* App-like feel: no pull-to-refresh / rubber-band that fights the reel swipe. */
+    overscroll-behavior-y: none;
+  }
+
+  /* Safe-area helpers for full-screen app screens (notch / status bar / home bar).
+     env() returns 0 where the hardware doesn't need it, so no odd gaps on flat phones. */
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
   }
 
   /* Stop iOS Safari from auto-zooming when a form field is focused: it triggers

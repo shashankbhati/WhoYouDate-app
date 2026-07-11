@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -261,6 +262,11 @@ function RootComponent() {
   const [showUsernameSetup, setShowUsernameSetup] = useState(false);
   const flushedRef = useRef(false);
 
+  // Full-screen "app" routes render edge-to-edge with no website chrome
+  // (header/footer) — the planner reel and the shared-plan screen ARE the screen.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const appScreen = pathname === "/plan" || pathname.startsWith("/p/");
+
   // Auto-save a date the user filled out before logging in. The entry was
   // stashed in localStorage by the log form; once auth completes (including
   // after the Google OAuth redirect), we persist it so it's never lost.
@@ -297,9 +303,9 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-background text-foreground">
-        <Header />
+        {!appScreen && <Header />}
         <Outlet />
-        <Footer />
+        {!appScreen && <Footer />}
         <Toaster />
         <AuthModal open={modal.open} message={modal.message} />
         <UsernameSetup open={showUsernameSetup} onDone={() => setShowUsernameSetup(false)} />

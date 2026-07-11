@@ -82,19 +82,25 @@ export function InstallPrompt() {
           📲
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Add to your home screen</p>
+          <p className="text-sm font-semibold">
+            For the best experience, we recommend adding us to your home screen:
+          </p>
           {hasPrompt ? (
-            <p className="mt-0.5 text-xs text-white/70">Open it like a real app — one tap.</p>
+            <p className="mt-1 text-xs text-white/70">
+              No address bar, smoother swiping — one tap to add it.
+            </p>
           ) : os === "ios" ? (
-            <p className="mt-0.5 text-xs text-white/70">
-              Tap <ShareIcon className="mx-0.5 inline size-3.5 -translate-y-px" /> then{" "}
-              <span className="font-semibold text-white">Add to Home Screen</span>.
+            <p className="mt-1 text-xs leading-relaxed text-white/70">
+              1. Tap <ShareIcon className="mx-0.5 inline size-3.5 -translate-y-px" /> (Share)
+              <br />
+              2. Choose <span className="font-semibold text-white">Add to Home Screen</span>
             </p>
           ) : (
-            <p className="mt-0.5 text-xs text-white/70">
-              Open the browser menu{" "}
-              <span className="font-semibold text-white">⋮</span> then{" "}
-              <span className="font-semibold text-white">Install app</span> / Add to Home screen.
+            <p className="mt-1 text-xs leading-relaxed text-white/70">
+              1. Open the browser menu <span className="font-semibold text-white">⋮</span>
+              <br />
+              2. Choose <span className="font-semibold text-white">Install app</span> / Add to Home
+              screen
             </p>
           )}
           {hasPrompt && (
