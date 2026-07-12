@@ -237,12 +237,14 @@ function PlanPage() {
           {/* Header — now inside the design */}
           <div>
             <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.25em] text-white/40">
-              New date · draft 01
+              Plan a date · 30 seconds
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-balance">
-              Tell me the shape of it.
+              Plan a date they'll say yes to.
             </h1>
-            <p className="mt-1 text-sm text-white/60">A few taps. I'll write the reel.</p>
+            <p className="mt-1 text-sm text-white/60">
+              Tell me who, where, and the vibe — I'll map the whole night, ready to share.
+            </p>
           </div>
           {/* For + In */}
           <div className="grid grid-cols-[1fr_auto] items-end gap-3">
@@ -257,7 +259,7 @@ function PlanPage() {
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="your date"
+                  placeholder="their name"
                   className="w-full border-b border-white/15 bg-transparent pb-1 text-2xl font-semibold tracking-tight outline-none placeholder:text-white/30 focus:border-[color:var(--color-reel-rose)]"
                 />
               </div>
@@ -389,10 +391,10 @@ function PlanPage() {
             disabled={building}
             className="w-full rounded-full bg-[color:var(--color-reel-rose)] py-3.5 font-semibold text-neutral-950 transition active:scale-[0.99] disabled:opacity-60"
           >
-            {building ? "Writing…" : "Write the reel →"}
+            {building ? "Planning…" : "Plan the date →"}
           </button>
           <p className="text-center [font-family:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/30">
-            A roadmap · private prompts · your best moves
+            A full itinerary · what to say · your smartest moves
           </p>
         </div>
       </form>
