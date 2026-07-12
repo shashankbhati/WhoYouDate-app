@@ -93,7 +93,21 @@ export function sharedPlanNotifications(
         ts,
         countsUnread: true,
       });
+    } else if (hasOtherReaction(p, iAmOwner)) {
+      out.push({
+        id: "sp-r-" + p.id,
+        icon: "💞",
+        title: `${other} reacted to the date`,
+        sub: where,
+        ts,
+        countsUnread: true,
+      });
     }
   }
   return out;
+}
+
+function hasOtherReaction(p: SharedPlan, iAmOwner: boolean): boolean {
+  const otherSide = iAmOwner ? "r" : "o";
+  return Object.values(p.reactions ?? {}).some((e) => e && e[otherSide]);
 }

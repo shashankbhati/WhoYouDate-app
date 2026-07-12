@@ -45,7 +45,11 @@ export interface SharedPlan {
   recipientId?: string; // who opened the plan (the date), if a logged-in non-owner
   recipientName?: string; // their chosen display name — for the owner's inbox
   recipientSeenAt?: string; // recipient's "seen" stamp — powers their unread dot
+  reactions?: Reactions; // per-stop reactions: order → { o?: emoji, r?: emoji }
 }
+
+// stop order (as string) → the owner's (o) and recipient's (r) chosen emoji
+export type Reactions = Record<string, { o?: string; r?: string }>;
 
 const MAX_MESSAGES = 30; // embedded thread cap — one row, never a chat table
 
@@ -184,6 +188,7 @@ function rowToShared(data: any): SharedPlan {
     recipientId: data.recipient_id ?? undefined,
     recipientName: data.recipient_name ?? undefined,
     recipientSeenAt: data.recipient_seen_at ?? undefined,
+    reactions: (data.reactions ?? {}) as Reactions,
   };
 }
 
@@ -229,6 +234,19 @@ export async function markRecipient(id: string, userId: string, name: string): P
     .update({ recipient_id: userId, recipient_name: name })
     .eq("id", id)
     .is("recipient_id", null);
+}
+
+// Save the whole reactions map + stamp who did it, so the other side is notified.
+export async function setReactions(
+  id: string,
+  reactions: Reactions,
+  actorName: string,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("shared_plans")
+    .update({ reactions, last_actor: actorName, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  return !error;
 }
 
 // Recipient opened the plan → clear their "new update" indicator.

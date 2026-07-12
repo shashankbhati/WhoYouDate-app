@@ -18,6 +18,7 @@ import { Toaster } from "../components/ui/sonner";
 import { AuthModal } from "../components/auth/AuthModal";
 import { UsernameSetup } from "../components/auth/UsernameSetup";
 import { InstallPrompt } from "../components/InstallPrompt";
+import { Onboarding } from "../components/Onboarding";
 import { useAuthState } from "../lib/auth";
 import { useStore, takePendingEntry, addEntry } from "../lib/datedata/store";
 
@@ -310,6 +311,7 @@ function RootComponent() {
         <AuthModal open={modal.open} message={modal.message} />
         <UsernameSetup open={showUsernameSetup} onDone={() => setShowUsernameSetup(false)} />
         <InstallPrompt />
+        {!appScreen && <Onboarding />}
       </div>
     </QueryClientProvider>
   );

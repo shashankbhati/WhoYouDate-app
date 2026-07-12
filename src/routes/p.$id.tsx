@@ -10,10 +10,12 @@ import {
   markOwnerSeen,
   markRecipient,
   markRecipientSeen,
+  setReactions,
   subscribeSharedPlan,
   whoAmI,
   type SharedPlan,
   type SharedStep,
+  type Reactions,
 } from "@/lib/dateplan/share";
 import type { Venue } from "@/lib/dateplan/types";
 import { JourneyMap } from "@/components/JourneyMap";
@@ -123,6 +125,21 @@ function SharedPlanView({ id }: { id: string }) {
     if (!ok) toast.error("Couldn't save the change — try again.");
   }
 
+  async function react(order: number, emoji: string) {
+    if (!isReal) return openAuthModal("Sign in to react.");
+    if (!plan) return;
+    const side = isOwner ? "o" : "r";
+    const key = String(order);
+    const cur: Reactions = { ...(plan.reactions ?? {}) };
+    const entry = { ...(cur[key] ?? {}) };
+    if (entry[side] === emoji) delete entry[side];
+    else entry[side] = emoji;
+    if (!entry.o && !entry.r) delete cur[key];
+    else cur[key] = entry;
+    setPlan({ ...plan, reactions: cur });
+    await setReactions(id, cur, me?.name ?? "Your date");
+  }
+
   async function accept() {
     if (!isReal) return openAuthModal("Sign in to accept this plan.");
     if (!plan) return;
@@ -161,6 +178,7 @@ function SharedPlanView({ id }: { id: string }) {
       cityVenues={cityVenues}
       onSwap={swap}
       onAccept={accept}
+      onReact={react}
       onPosted={(msgs) => setPlan({ ...plan, messages: msgs })}
       id={id}
     />
@@ -199,6 +217,7 @@ function SharedReelScreen({
   cityVenues,
   onSwap,
   onAccept,
+  onReact,
   onPosted,
   id,
 }: {
@@ -208,6 +227,7 @@ function SharedReelScreen({
   cityVenues: Venue[];
   onSwap: (order: number, v: Venue) => void;
   onAccept: () => void;
+  onReact: (order: number, emoji: string) => void;
   onPosted: (m: SharedPlan["messages"]) => void;
   id: string;
 }) {
@@ -316,6 +336,9 @@ function SharedReelScreen({
                 total={total}
                 cityVenues={cityVenues}
                 onSwap={onSwap}
+                isOwner={isOwner}
+                react={plan.reactions?.[String(s.order)]}
+                onReact={onReact}
               />
             )
           )}
@@ -325,20 +348,30 @@ function SharedReelScreen({
   );
 }
 
+const REACTIONS = ["❤️", "🔥", "👀", "😅"];
+
 function SharedChapter({
   s,
   idx,
   total,
   cityVenues,
   onSwap,
+  isOwner,
+  react,
+  onReact,
 }: {
   s: SharedStep;
   idx: number;
   total: number;
   cityVenues: Venue[];
   onSwap: (order: number, v: Venue) => void;
+  isOwner: boolean;
+  react?: { o?: string; r?: string };
+  onReact: (order: number, emoji: string) => void;
 }) {
   const [drawer, setDrawer] = useState(false);
+  const mineSide = isOwner ? "o" : "r";
+  const otherSide = isOwner ? "r" : "o";
   const kind = s.title.split(" — ")[0];
   const place = s.venue?.name ?? s.title;
   const startTime = s.timeLabel?.split(" – ")[0] ?? "";
@@ -377,6 +410,35 @@ function SharedChapter({
           {s.venue?.area && (
             <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur">
               📍 {s.venue.area}
+            </span>
+          )}
+        </div>
+
+        {/* Reactions — the two-way loop. Mine = white, their pick = rose pill. */}
+        <div className="pointer-events-auto mt-4 flex items-center gap-2">
+          {REACTIONS.map((e) => {
+            const mine = react?.[mineSide] === e;
+            const other = react?.[otherSide] === e;
+            return (
+              <button
+                key={e}
+                onClick={() => onReact(s.order, e)}
+                aria-label={`React ${e}`}
+                className={`grid size-9 place-items-center rounded-full border text-base transition active:scale-90 ${
+                  mine
+                    ? "border-white bg-white/20"
+                    : other
+                      ? "border-[color:var(--color-reel-rose)] bg-[color:var(--color-reel-rose)]/15"
+                      : "border-white/15 bg-white/[0.04]"
+                }`}
+              >
+                {e}
+              </button>
+            );
+          })}
+          {react?.[otherSide] && (
+            <span className="ml-auto rounded-full bg-white/10 px-2.5 py-1 text-[11px] text-white/70">
+              {react[otherSide]} them
             </span>
           )}
         </div>
@@ -479,6 +541,15 @@ function SharedDetails({
           className="mt-4 w-full rounded-full bg-[color:var(--color-reel-rose)] py-3 font-semibold text-neutral-950 transition hover:opacity-90"
         >
           💗 Accept this plan
+        </button>
+      )}
+
+      {plan.date && (
+        <button
+          onClick={() => addToCalendar(plan)}
+          className="mt-3 w-full rounded-full border border-white/20 bg-white/[0.05] py-2.5 text-sm font-semibold text-white transition hover:bg-white/[0.1]"
+        >
+          🗓️ Add to calendar
         </button>
       )}
 
@@ -608,6 +679,49 @@ function MessageThread({
       </div>
     </div>
   );
+}
+
+// Build a calendar event (.ics) for the date, so the recipient can add it in one
+// tap — it also brings them back at date-time.
+function buildICS(plan: SharedPlan): string {
+  const date = plan.date ?? "";
+  const first = plan.steps[0];
+  const startT = (first?.timeLabel?.split(" – ")[0] ?? "19:00").trim();
+  const lastStep = plan.steps[plan.steps.length - 1];
+  const endT = (lastStep?.timeLabel?.split(" – ")[1] ?? "22:00").trim();
+  const compact = (t: string) => t.replace(":", "").padEnd(4, "0").slice(0, 4);
+  const dt = (t: string) => date.replace(/-/g, "") + "T" + compact(t) + "00";
+  const esc = (s: string) => s.replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
+  const title = plan.ownerName ? `Date with ${plan.ownerName}` : `Date in ${plan.city}`;
+  const loc = first?.venue?.name ?? plan.city;
+  const desc = plan.steps.map((s, i) => `${i + 1}. ${s.venue?.name ?? s.title}`).join("\n");
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//WhoAmIDating//Date Plan//EN",
+    "BEGIN:VEVENT",
+    `UID:${plan.id}@whoamidating.singles`,
+    `DTSTART:${dt(startT)}`,
+    `DTEND:${dt(endT)}`,
+    `SUMMARY:${esc(title)}`,
+    `LOCATION:${esc(loc)}`,
+    `DESCRIPTION:${esc(desc)}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+}
+
+function addToCalendar(plan: SharedPlan) {
+  if (typeof document === "undefined" || !plan.date) return;
+  const blob = new Blob([buildICS(plan)], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `date-${plan.date}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function fmtDate(iso: string): string {
