@@ -4,7 +4,8 @@ import { useStore, addPost, addComment, voteOnPost, getUserId, deletePost, delet
 import { FEMALE_NAMES_ALL, MALE_NAMES_ALL } from "@/lib/datedata/seed";
 import { ACTIVITY_META } from "@/lib/datedata/types";
 import { detectPII } from "@/lib/datedata/pii";
-import { isRealUser, openAuthModal } from "@/lib/auth";
+import { isRealUser, openAuthModal, useAuthState } from "@/lib/auth";
+import { AppHome } from "@/components/AppHome";
 import { useCountry, setCountry } from "@/lib/country";
 import { COUNTRY_CONFIG, fmtAmount, currencySymbol, type CountryCode } from "@/lib/datedata/countries";
 import { Plus, MessageSquare, Share2, ArrowUp, ArrowDown, Flame, Send, Search, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react";
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/")({
       { name: "keywords", content: "dating cost tracker, how much does a date cost, dating in Berlin, dating in Delhi, dating expenses, anonymous dating app, date cost India, date cost Germany" },
     ],
   }),
-  component: Home,
+  component: HomeRoute,
 });
 
 const FEATURED_NAMES: Record<CountryCode, string[]> = {
@@ -157,7 +158,15 @@ function CompareHook({ entries, currency, currencySymbol }: { entries: ReturnTyp
   );
 }
 
-function Home() {
+// Logged-in users get the phone-app home (full-screen, over the site chrome —
+// same technique as the plan reel). Logged-out visitors keep the curiosity /
+// SEO home below, untouched.
+function HomeRoute() {
+  const { isReal } = useAuthState();
+  return isReal ? <AppHome /> : <OGHome />;
+}
+
+function OGHome() {
   const { entries, posts, loading, profile } = useStore();
   const { country, config } = useCountry();
   const [city, setCity] = useState<string>(config.defaultCity);
