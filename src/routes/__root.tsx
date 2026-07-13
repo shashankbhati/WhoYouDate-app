@@ -273,6 +273,7 @@ function RootComponent() {
     pathname === "/dates" ||
     pathname === "/stats" ||
     pathname === "/profile" ||
+    pathname === "/discover" ||
     pathname.startsWith("/p/");
 
   // Auto-save a date the user filled out before logging in. The entry was
