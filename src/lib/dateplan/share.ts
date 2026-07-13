@@ -53,6 +53,32 @@ export type Reactions = Record<string, { o?: string; r?: string }>;
 
 const MAX_MESSAGES = 30; // embedded thread cap — one row, never a chat table
 
+// Fire-and-forget: ask the server to push the OTHER party on this plan. No-ops if
+// the viewer is logged out or push isn't configured (endpoint returns skipped).
+async function notifyOther(
+  planId: string,
+  kind: "message" | "accept" | "react" | "change",
+  text?: string,
+): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return;
+    void fetch("/api/notify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ planId, kind, text }),
+    }).catch(() => {});
+  } catch {
+    /* never block the UI on a notification */
+  }
+}
+
 // The name the user chose for themselves (their profile display name / username).
 async function displayNameFor(userId: string): Promise<string> {
   const { data } = await supabase
@@ -246,6 +272,7 @@ export async function setReactions(
     .from("shared_plans")
     .update({ reactions, last_actor: actorName, updated_at: new Date().toISOString() })
     .eq("id", id);
+  if (!error) void notifyOther(id, "react");
   return !error;
 }
 
@@ -272,6 +299,7 @@ export async function saveSharedSteps(
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
+  if (!error) void notifyOther(id, "change");
   return !error;
 }
 
@@ -286,6 +314,7 @@ export async function acceptSharedPlan(id: string): Promise<boolean> {
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
+  if (!error) void notifyOther(id, "accept");
   return !error;
 }
 
@@ -313,6 +342,7 @@ export async function postSharedMessage(
     .from("shared_plans")
     .update({ messages, last_actor: msg.actor, updated_at: new Date().toISOString() })
     .eq("id", id);
+  if (!error) void notifyOther(id, "message", text);
   return error ? null : messages;
 }
 

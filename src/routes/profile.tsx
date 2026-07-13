@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore, saveProfile, getUserId } from "@/lib/datedata/store";
 import { ACTIVITY_META, type AgeRange, type Profile } from "@/lib/datedata/types";
 import { BADGES, earnedBadges } from "@/lib/datedata/badges";
 import { useAuthState, openAuthModal, updatePassword } from "@/lib/auth";
+import { pushSupported, isPushEnabled, enablePush, disablePush } from "@/lib/push";
 import { AppShell } from "@/components/AppShell";
 import { Settings, Share2, Check, ExternalLink, Mail, KeyRound } from "lucide-react";
 import { toast } from "sonner";
@@ -301,10 +302,69 @@ function AccountCard() {
         )}
       </div>
 
+      <PushToggle />
+
       <p className="mt-4 text-[11px] text-muted-foreground">
         🔒 We can never show your password — it's stored only as a secure one-way hash, so nobody
         (not even us) can read it.
       </p>
+    </div>
+  );
+}
+
+// Enable/disable web push — a ping when your date replies, accepts, or reacts.
+// Hidden entirely if the browser or the app config doesn't support push.
+function PushToggle() {
+  const [supported, setSupported] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setSupported(pushSupported());
+    isPushEnabled().then(setEnabled);
+  }, []);
+
+  if (!supported) return null;
+
+  async function toggle() {
+    setBusy(true);
+    if (enabled) {
+      await disablePush();
+      setEnabled(false);
+      toast.success("Notifications off");
+    } else {
+      const r = await enablePush();
+      if (r.ok) {
+        setEnabled(true);
+        toast.success("Notifications on 🔔");
+      } else if (r.error === "denied") {
+        toast.error("Allow notifications in your browser settings, then try again.");
+      } else {
+        toast.error("Couldn't enable notifications on this device.");
+      }
+    }
+    setBusy(false);
+  }
+
+  return (
+    <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">Push notifications</p>
+        <p className="text-xs text-muted-foreground">
+          Get pinged when your date replies, accepts, or reacts.
+        </p>
+      </div>
+      <button
+        onClick={toggle}
+        disabled={busy}
+        className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition disabled:opacity-60 ${
+          enabled
+            ? "border border-border text-foreground hover:bg-muted"
+            : "bg-primary text-primary-foreground hover:opacity-90"
+        }`}
+      >
+        {busy ? "…" : enabled ? "On" : "Enable"}
+      </button>
     </div>
   );
 }
