@@ -195,17 +195,21 @@ function Stats() {
   return (
     <AppShell>
       <div className="px-4 py-6 pt-safe text-white">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Your Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Hey {profile?.displayName ?? "there"} 👋</p>
+          <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/45">
+            Your ledger
+          </p>
+          <h1 className="[font-family:var(--font-display)] mt-1 text-3xl tracking-wide">
+            Hey {profile?.displayName ?? "there"}
+          </h1>
         </div>
         {mine.length > 0 && (
           <button
             onClick={handleShare}
-            className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary transition shrink-0"
+            className="flex shrink-0 items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white/70 transition hover:text-white"
           >
-            <Share2 className="h-4 w-4" /> share my stats
+            <Share2 className="h-4 w-4" /> Share
           </button>
         )}
       </div>
@@ -506,9 +510,11 @@ function EntryRow({ entry: e }: { entry: ReturnType<typeof useStore>["entries"][
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">{icon} {label}</div>
-      <div className="mt-2 text-3xl font-bold">{value}</div>
+    <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/45">
+        {icon} {label}
+      </div>
+      <div className="mt-1.5 text-2xl font-bold">{value}</div>
     </div>
   );
 }

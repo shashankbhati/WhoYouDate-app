@@ -64,7 +64,12 @@ function ProfilePage() {
   return (
     <AppShell>
       <div className="px-4 py-6 pt-safe text-white">
-      <h1 className="text-3xl font-bold">Profile</h1>
+      <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/45">
+        Your profile
+      </p>
+      <h1 className="[font-family:var(--font-display)] mt-1 text-3xl tracking-wide">
+        {profile?.displayName ?? draft.displayName}
+      </h1>
 
       <div className="mt-8 grid gap-6">
         {/* Left: recent dates + badges */}

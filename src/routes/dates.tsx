@@ -148,17 +148,17 @@ function DateRow({ p, mine, myName }: { p: SharedPlan; mine: boolean; myName: st
       <Link
         to="/p/$id"
         params={{ id: p.id }}
-        className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40"
+        className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-4 transition hover:border-white/20"
       >
-        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-xl">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[color:var(--color-reel-rose-soft)] text-xl">
           {p.status === "accepted" ? "💗" : "💌"}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate font-semibold">{who}</p>
-            {unread && <span className="size-2 shrink-0 rounded-full bg-primary" />}
+            {unread && <span className="size-2 shrink-0 rounded-full bg-[color:var(--color-reel-rose)]" />}
           </div>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="truncate text-xs text-white/45">
             {p.city}
             {p.date ? ` · ${fmtDate(p.date)}` : ""}
             {lastMsg ? ` · "${lastMsg.text.slice(0, 40)}"` : ""}
