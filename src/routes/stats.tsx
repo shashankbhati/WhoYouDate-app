@@ -10,6 +10,7 @@ import { sharePersonalCard } from "@/lib/shareCard";
 import { computePlaybook } from "@/lib/datedata/playbook";
 import { computeInsights } from "@/lib/datedata/insights";
 import { useCountry } from "@/lib/country";
+import { AppShell } from "@/components/AppShell";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/stats")({
@@ -179,18 +180,21 @@ function Stats() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-7xl px-4 py-8">
-        <div className="h-8 w-48 animate-pulse rounded-lg bg-muted mb-2" />
-        <div className="h-4 w-32 animate-pulse rounded-lg bg-muted mb-8" />
-        <div className="grid sm:grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => <div key={i} className="rounded-2xl border border-border bg-card p-5 h-24 animate-pulse" />)}
+      <AppShell>
+        <div className="px-4 py-6 pt-safe">
+          <div className="h-8 w-48 animate-pulse rounded-lg bg-muted mb-2" />
+          <div className="h-4 w-32 animate-pulse rounded-lg bg-muted mb-8" />
+          <div className="grid sm:grid-cols-2 gap-4">
+            {[...Array(4)].map((_, i) => <div key={i} className="rounded-2xl border border-border bg-card p-5 h-24 animate-pulse" />)}
+          </div>
         </div>
-      </main>
+      </AppShell>
     );
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8">
+    <AppShell>
+      <div className="px-4 py-6 pt-safe text-white">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Your Dashboard</h1>
@@ -230,7 +234,7 @@ function Stats() {
         </div>
       )}
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="mt-8 grid gap-6">
         <div className="space-y-6">
           <div className="grid sm:grid-cols-2 gap-4">
             <StatCard icon={<Calendar className="h-4 w-4 text-primary" />} label="Total Entries" value={String(mine.length)} />
@@ -408,7 +412,8 @@ function Stats() {
           </div>
         </aside>
       </div>
-    </main>
+      </div>
+    </AppShell>
   );
 }
 

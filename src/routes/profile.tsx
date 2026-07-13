@@ -4,6 +4,7 @@ import { useStore, saveProfile, getUserId } from "@/lib/datedata/store";
 import { ACTIVITY_META, type AgeRange, type Profile } from "@/lib/datedata/types";
 import { BADGES, earnedBadges } from "@/lib/datedata/badges";
 import { useAuthState, openAuthModal, updatePassword } from "@/lib/auth";
+import { AppShell } from "@/components/AppShell";
 import { Settings, Share2, Check, ExternalLink, Mail, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
@@ -61,10 +62,11 @@ function ProfilePage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8">
+    <AppShell>
+      <div className="px-4 py-6 pt-safe text-white">
       <h1 className="text-3xl font-bold">Profile</h1>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[280px_1fr_280px]">
+      <div className="mt-8 grid gap-6">
         {/* Left: recent dates + badges */}
         <aside className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-5">
@@ -195,7 +197,8 @@ function ProfilePage() {
           </div>
         </aside>
       </div>
-    </main>
+      </div>
+    </AppShell>
   );
 }
 

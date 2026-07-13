@@ -266,7 +266,14 @@ function RootComponent() {
   // Full-screen "app" routes render edge-to-edge with no website chrome
   // (header/footer) — the planner reel and the shared-plan screen ARE the screen.
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const appScreen = pathname === "/plan" || pathname.startsWith("/p/");
+  // Full-screen phone-app routes render their own AppShell (bottom tab bar) over
+  // the site chrome — hide the website header/footer on them.
+  const appScreen =
+    pathname === "/plan" ||
+    pathname === "/dates" ||
+    pathname === "/stats" ||
+    pathname === "/profile" ||
+    pathname.startsWith("/p/");
 
   // Auto-save a date the user filled out before logging in. The entry was
   // stashed in localStorage by the log form; once auth completes (including

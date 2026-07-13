@@ -6,10 +6,10 @@ import type { ReactNode } from "react";
 // palette, safe-area aware. Tabs point at the real app routes.
 const LEFT_TABS = [
   { to: "/", label: "Home", icon: "◐" },
-  { to: "/plan", label: "Plans", icon: "◇" },
+  { to: "/dates", label: "Plans", icon: "◇" },
 ] as const;
 const RIGHT_TABS = [
-  { to: "/dates", label: "Dates", icon: "◉" },
+  { to: "/stats", label: "Dates", icon: "◉" },
   { to: "/profile", label: "You", icon: "☾" },
 ] as const;
 

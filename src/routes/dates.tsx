@@ -3,6 +3,7 @@ import { useAuthState, openAuthModal } from "@/lib/auth";
 import { useStore } from "@/lib/datedata/store";
 import { useSharedInbox } from "@/lib/dateplan/inbox";
 import type { SharedPlan } from "@/lib/dateplan/share";
+import { AppShell } from "@/components/AppShell";
 
 export const Route = createFileRoute("/dates")({
   head: () => ({
@@ -35,30 +36,41 @@ function MyDatesPage() {
 
   if (!isReal) {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <p className="text-4xl">💌</p>
-        <h1 className="mt-3 text-2xl font-bold">Your dates</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Sign in to see the dates you've planned and the ones shared with you.
-        </p>
-        <button
-          onClick={() => openAuthModal("Sign in to see your dates.")}
-          className="mt-5 rounded-full bg-primary px-6 py-2.5 font-semibold text-primary-foreground transition hover:opacity-90"
-        >
-          Sign in
-        </button>
-      </main>
+      <AppShell>
+        <div className="px-5 py-16 text-center pt-safe">
+          <p className="text-4xl">💌</p>
+          <h1 className="mt-3 text-2xl font-bold">Your dates</h1>
+          <p className="mt-2 text-sm text-white/60">
+            Sign in to see the dates you've planned and the ones shared with you.
+          </p>
+          <button
+            onClick={() => openAuthModal("Sign in to see your dates.")}
+            className="mt-5 rounded-full bg-[color:var(--color-reel-rose)] px-6 py-2.5 font-semibold text-neutral-950 transition hover:opacity-90"
+          >
+            Sign in
+          </button>
+        </div>
+      </AppShell>
     );
   }
 
   const empty = sent.length === 0 && received.length === 0;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-2xl font-bold tracking-tight">Your dates</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Plans you've shared and plans shared with you — open one to see it and chat.
-      </p>
+    <AppShell>
+      <div className="px-5 py-6 pt-safe text-white">
+        <div className="flex items-end justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Your plans</h1>
+            <p className="mt-1 text-sm text-white/55">Shared with you & sent by you.</p>
+          </div>
+          <Link
+            to="/plan"
+            className="shrink-0 rounded-full bg-[color:var(--color-reel-rose)] px-4 py-2 text-sm font-semibold text-neutral-950"
+          >
+            + Plan
+          </Link>
+        </div>
 
       {empty ? (
         <div className="mt-8 rounded-2xl border border-border bg-card p-8 text-center">
@@ -84,7 +96,8 @@ function MyDatesPage() {
           )}
         </div>
       )}
-    </main>
+      </div>
+    </AppShell>
   );
 }
 
