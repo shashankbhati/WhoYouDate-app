@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useStore } from "@/lib/datedata/store";
 import {
   useDatePlanStore,
@@ -399,6 +399,8 @@ function PlanPage() {
         </div>
       </form>
 
+      <EventsCard city={city} date={date} />
+
       {!hasCuratedTemplate(city) && (
         <p className="mx-auto mt-3 max-w-[440px] text-center text-xs text-white/40">
           More cities are being added.{" "}
@@ -411,6 +413,81 @@ function PlanPage() {
         </p>
       )}
     </main>
+  );
+}
+
+interface TmEvent {
+  id: string;
+  name: string;
+  url?: string;
+  date?: string;
+  time?: string;
+  venue?: string;
+  segment?: string;
+}
+
+// Live events (concerts/shows/sports) in the chosen city around the date, from
+// /api/events (Ticketmaster). Text-only — no third-party images (GDPR). Hidden
+// when there are none or the key isn't configured.
+function EventsCard({ city, date }: { city: string; date: string }) {
+  const [events, setEvents] = useState<TmEvent[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const c = city.trim();
+    if (c.length < 2) {
+      setEvents([]);
+      setLoaded(false);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(() => {
+      fetch(`/api/events?city=${encodeURIComponent(c)}&date=${encodeURIComponent(date)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (alive) {
+            setEvents((d.events ?? []) as TmEvent[]);
+            setLoaded(true);
+          }
+        })
+        .catch(() => {
+          if (alive) setLoaded(true);
+        });
+    }, 600);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [city, date]);
+
+  if (!loaded || events.length === 0) return null;
+
+  return (
+    <div className="mx-auto mt-4 max-w-[440px] rounded-[28px] border border-white/10 bg-[color:var(--color-reel-surface)] p-5 text-white [font-family:var(--font-sans)]">
+      <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.25em] text-white/45">
+        🎟️ Happening in {city.trim()}
+      </p>
+      <p className="mt-0.5 text-sm text-white/55">Something real to build the date around.</p>
+      <div className="mt-3 space-y-2">
+        {events.map((ev) => (
+          <a
+            key={ev.id}
+            href={ev.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3 transition hover:bg-white/[0.06]"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{ev.name}</p>
+              <p className="truncate text-xs text-white/45">
+                {[ev.venue, ev.time, ev.segment].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+            <span className="shrink-0 text-white/35">↗</span>
+          </a>
+        ))}
+      </div>
+    </div>
   );
 }
 
