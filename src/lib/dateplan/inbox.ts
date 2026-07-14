@@ -5,15 +5,16 @@ import { listMySharedPlans, listReceivedSharedPlans, type SharedPlan } from "./s
 export interface SharedInbox {
   sent: SharedPlan[]; // plans I shared (I'm the owner)
   received: SharedPlan[]; // plans shared with me (I opened them)
+  loading: boolean; // true until the first load completes
 }
 
 // Both sides of "My dates", refreshed on mount + a light poll. Returns empty
 // lists when not logged in.
 export function useSharedInbox(enabled = true, pollMs = 45000): SharedInbox {
-  const [inbox, setInbox] = useState<SharedInbox>({ sent: [], received: [] });
+  const [inbox, setInbox] = useState<SharedInbox>({ sent: [], received: [], loading: true });
   useEffect(() => {
     if (!enabled) {
-      setInbox({ sent: [], received: [] });
+      setInbox({ sent: [], received: [], loading: false });
       return;
     }
     let alive = true;
@@ -22,7 +23,7 @@ export function useSharedInbox(enabled = true, pollMs = 45000): SharedInbox {
         listMySharedPlans(),
         listReceivedSharedPlans(),
       ]);
-      if (alive) setInbox({ sent, received });
+      if (alive) setInbox({ sent, received, loading: false });
     };
     load();
     const t = setInterval(load, pollMs);

@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { AppShell } from "./AppShell";
+import { AppShell, AppLoading } from "./AppShell";
 import { useStore } from "@/lib/datedata/store";
 import { useCountry } from "@/lib/country";
 import { useSharedInbox } from "@/lib/dateplan/inbox";
@@ -46,9 +46,9 @@ function useCountdown(dateISO?: string) {
 }
 
 export function AppHome() {
-  const { entries, profile, userId } = useStore();
+  const { entries, profile, userId, profileChecked } = useStore();
   const { config } = useCountry();
-  const { sent, received } = useSharedInbox(true);
+  const { sent, received, loading: inboxLoading } = useSharedInbox(true);
   const sym = config.currencySymbol;
 
   const myName = profile?.displayName ?? "you";
@@ -82,6 +82,8 @@ export function AppHome() {
         .slice(0, 5),
     [entries],
   );
+
+  if (!profileChecked || inboxLoading) return <AppLoading />;
 
   return (
     <AppShell>

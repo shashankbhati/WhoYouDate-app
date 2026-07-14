@@ -10,7 +10,7 @@ import { sharePersonalCard } from "@/lib/shareCard";
 import { computePlaybook } from "@/lib/datedata/playbook";
 import { computeInsights } from "@/lib/datedata/insights";
 import { useCountry } from "@/lib/country";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, AppLoading } from "@/components/AppShell";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/stats")({
@@ -66,7 +66,7 @@ function DonutChart({ data }: { data: { name: string; value: number }[] }) {
 }
 
 function Stats() {
-  const { entries, profile, loading } = useStore();
+  const { entries, profile, profileChecked } = useStore();
   const { config } = useCountry();
   const userId = getUserId();
   const mine = entries.filter((e) => e.userId === userId);
@@ -178,19 +178,7 @@ function Stats() {
     });
   }
 
-  if (loading) {
-    return (
-      <AppShell>
-        <div className="px-4 py-6 pt-safe">
-          <div className="h-8 w-48 animate-pulse rounded-lg bg-muted mb-2" />
-          <div className="h-4 w-32 animate-pulse rounded-lg bg-muted mb-8" />
-          <div className="grid sm:grid-cols-2 gap-4">
-            {[...Array(4)].map((_, i) => <div key={i} className="rounded-2xl border border-border bg-card p-5 h-24 animate-pulse" />)}
-          </div>
-        </div>
-      </AppShell>
-    );
-  }
+  if (!profileChecked) return <AppLoading />;
 
   return (
     <AppShell>

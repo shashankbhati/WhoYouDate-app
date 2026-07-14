@@ -5,7 +5,7 @@ import { ACTIVITY_META, type AgeRange, type Profile } from "@/lib/datedata/types
 import { BADGES, earnedBadges } from "@/lib/datedata/badges";
 import { useAuthState, openAuthModal, updatePassword } from "@/lib/auth";
 import { pushSupported, isPushEnabled, enablePush, disablePush, sendTestPush } from "@/lib/push";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, AppLoading } from "@/components/AppShell";
 import { Settings, Share2, Check, ExternalLink, Mail, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,8 +16,17 @@ export const Route = createFileRoute("/profile")({
       { name: "description", content: "Your anonymous profile, badges, and dating activity summary." },
     ],
   }),
-  component: ProfilePage,
+  component: ProfileRoute,
 });
+
+// Gate on data so the profile draft initializes from the loaded profile (and no
+// logged-out/empty flash).
+function ProfileRoute() {
+  const { profileChecked } = useStore();
+  const { loading: authLoading } = useAuthState();
+  if (!profileChecked || authLoading) return <AppLoading />;
+  return <ProfilePage />;
+}
 
 const AGE_RANGES: AgeRange[] = ["18-24", "25-34", "35-44", "45+"];
 const STAGES = ["Dating", "In a relationship", "Married", "Other"];

@@ -134,6 +134,19 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
   );
 }
 
+// A neutral dark loading screen for app routes — rendered on the server and until
+// auth + data resolve, so users never see the logged-out HTML or empty content
+// flash before the real page appears.
+export function AppLoading() {
+  return (
+    <AppShell>
+      <div className="flex min-h-[70vh] items-center justify-center">
+        <div className="size-8 animate-spin rounded-full border-2 border-white/15 border-t-white/70" />
+      </div>
+    </AppShell>
+  );
+}
+
 function TabItem({
   tab,
   active,

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, AppLoading } from "@/components/AppShell";
 import { useStore, addPost } from "@/lib/datedata/store";
 import { useAuthState, openAuthModal } from "@/lib/auth";
 import { detectPII } from "@/lib/datedata/pii";
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/feed")({
 const TYPES: Post["type"][] = ["story", "advice", "question", "observation"];
 
 function FeedPage() {
-  const { posts, profile } = useStore();
+  const { posts, profile, profileChecked } = useStore();
   const { isReal } = useAuthState();
   const [text, setText] = useState("");
   const [type, setType] = useState<Post["type"]>("story");
@@ -54,6 +54,8 @@ function FeedPage() {
     setText("");
     toast.success("Posted 🎉");
   }
+
+  if (!profileChecked) return <AppLoading />;
 
   return (
     <AppShell>

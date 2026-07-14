@@ -3,7 +3,7 @@ import { useAuthState, openAuthModal } from "@/lib/auth";
 import { useStore } from "@/lib/datedata/store";
 import { useSharedInbox } from "@/lib/dateplan/inbox";
 import type { SharedPlan } from "@/lib/dateplan/share";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, AppLoading } from "@/components/AppShell";
 
 export const Route = createFileRoute("/dates")({
   head: () => ({
@@ -29,10 +29,12 @@ function fmtDate(iso?: string): string {
 }
 
 function MyDatesPage() {
-  const { isReal } = useAuthState();
-  const { profile } = useStore();
-  const { sent, received } = useSharedInbox(isReal);
+  const { isReal, loading: authLoading } = useAuthState();
+  const { profile, profileChecked } = useStore();
+  const { sent, received, loading: inboxLoading } = useSharedInbox(isReal);
   const myName = profile?.displayName ?? "";
+
+  if (authLoading || !profileChecked || (isReal && inboxLoading)) return <AppLoading />;
 
   if (!isReal) {
     return (

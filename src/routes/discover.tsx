@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, AppLoading } from "@/components/AppShell";
 import { useStore } from "@/lib/datedata/store";
 import { getCountry } from "@/lib/country";
 import { COUNTRY_CONFIG, type CountryCode } from "@/lib/datedata/countries";
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/discover")({
 const TABS: CountryCode[] = ["all", "DE", "IN", "US"];
 
 function Discover() {
-  const { entries } = useStore();
+  const { entries, profileChecked } = useStore();
   const [cc, setCc] = useState<CountryCode>(() => getCountry());
   const [q, setQ] = useState("");
   const cfg = COUNTRY_CONFIG[cc];
@@ -90,6 +90,8 @@ function Discover() {
       topCities,
     };
   }, [q, scoped]);
+
+  if (!profileChecked) return <AppLoading />;
 
   return (
     <AppShell>
