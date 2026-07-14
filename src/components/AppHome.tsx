@@ -158,6 +158,22 @@ export function AppHome() {
         </Link>
       </div>
 
+      <div className="mx-4 mt-3">
+        <Link
+          to="/feed"
+          className="flex items-center justify-between gap-3 rounded-3xl border border-white/10 bg-[color:var(--color-reel-surface)] p-5 transition hover:border-white/20"
+        >
+          <div>
+            <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.25em] text-white/45">
+              Community
+            </p>
+            <h3 className="mt-1 text-lg font-bold">Share a dating story</h3>
+            <p className="mt-0.5 text-sm text-white/55">Confessions & advice · anonymous</p>
+          </div>
+          <span className="text-3xl">✍️</span>
+        </Link>
+      </div>
+
       <WeeklyCheckin />
 
       {fresh.length > 0 && (

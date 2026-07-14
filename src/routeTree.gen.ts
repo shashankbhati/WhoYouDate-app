@@ -17,6 +17,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PlanAdminRouteImport } from './routes/plan-admin'
 import { Route as PlanRouteImport } from './routes/plan'
 import { Route as LogRouteImport } from './routes/log'
+import { Route as FeedRouteImport } from './routes/feed'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DemoRouteImport } from './routes/demo'
 import { Route as DatesRouteImport } from './routes/dates'
@@ -63,6 +64,11 @@ const LogRoute = LogRouteImport.update({
   path: '/log',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeedRoute = FeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DiscoverRoute = DiscoverRouteImport.update({
   id: '/discover',
   path: '/discover',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/dates': typeof DatesRoute
   '/demo': typeof DemoRoute
   '/discover': typeof DiscoverRoute
+  '/feed': typeof FeedRoute
   '/log': typeof LogRoute
   '/plan': typeof PlanRoute
   '/plan-admin': typeof PlanAdminRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/dates': typeof DatesRoute
   '/demo': typeof DemoRoute
   '/discover': typeof DiscoverRoute
+  '/feed': typeof FeedRoute
   '/log': typeof LogRoute
   '/plan': typeof PlanRoute
   '/plan-admin': typeof PlanAdminRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/dates': typeof DatesRoute
   '/demo': typeof DemoRoute
   '/discover': typeof DiscoverRoute
+  '/feed': typeof FeedRoute
   '/log': typeof LogRoute
   '/plan': typeof PlanRoute
   '/plan-admin': typeof PlanAdminRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/dates'
     | '/demo'
     | '/discover'
+    | '/feed'
     | '/log'
     | '/plan'
     | '/plan-admin'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/dates'
     | '/demo'
     | '/discover'
+    | '/feed'
     | '/log'
     | '/plan'
     | '/plan-admin'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/dates'
     | '/demo'
     | '/discover'
+    | '/feed'
     | '/log'
     | '/plan'
     | '/plan-admin'
@@ -188,6 +200,7 @@ export interface RootRouteChildren {
   DatesRoute: typeof DatesRoute
   DemoRoute: typeof DemoRoute
   DiscoverRoute: typeof DiscoverRoute
+  FeedRoute: typeof FeedRoute
   LogRoute: typeof LogRoute
   PlanRoute: typeof PlanRoute
   PlanAdminRoute: typeof PlanAdminRoute
@@ -257,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/feed': {
+      id: '/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof FeedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/discover': {
       id: '/discover'
       path: '/discover'
@@ -300,6 +320,7 @@ const rootRouteChildren: RootRouteChildren = {
   DatesRoute: DatesRoute,
   DemoRoute: DemoRoute,
   DiscoverRoute: DiscoverRoute,
+  FeedRoute: FeedRoute,
   LogRoute: LogRoute,
   PlanRoute: PlanRoute,
   PlanAdminRoute: PlanAdminRoute,
