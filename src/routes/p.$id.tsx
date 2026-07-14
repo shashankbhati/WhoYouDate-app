@@ -11,6 +11,8 @@ import {
   markRecipient,
   markRecipientSeen,
   setReactions,
+  updateSharedDate,
+  deleteSharedPlan,
   subscribeSharedPlan,
   whoAmI,
   type SharedPlan,
@@ -149,6 +151,23 @@ function SharedPlanView({ id }: { id: string }) {
     else toast.error("Couldn't save — try again.");
   }
 
+  async function editDate(d: string) {
+    if (!isReal) return openAuthModal("Sign in to set the date.");
+    if (!plan) return;
+    setPlan({ ...plan, date: d || undefined, status: "changed" });
+    const ok = await updateSharedDate(id, d, me?.name ?? "Your date");
+    if (!ok) toast.error("Couldn't save the date — try again.");
+  }
+
+  async function remove() {
+    if (!plan) return;
+    const ok = await deleteSharedPlan(id);
+    if (ok) {
+      toast.success("Plan removed");
+      window.location.href = "/dates";
+    } else toast.error("Couldn't remove — try again.");
+  }
+
   if (loading) {
     return (
       <Shell>
@@ -179,6 +198,8 @@ function SharedPlanView({ id }: { id: string }) {
       onSwap={swap}
       onAccept={accept}
       onReact={react}
+      onEditDate={editDate}
+      onDelete={remove}
       onPosted={(msgs) => setPlan({ ...plan, messages: msgs })}
       id={id}
     />
@@ -218,6 +239,8 @@ function SharedReelScreen({
   onSwap,
   onAccept,
   onReact,
+  onEditDate,
+  onDelete,
   onPosted,
   id,
 }: {
@@ -228,6 +251,8 @@ function SharedReelScreen({
   onSwap: (order: number, v: Venue) => void;
   onAccept: () => void;
   onReact: (order: number, emoji: string) => void;
+  onEditDate: (d: string) => void;
+  onDelete: () => void;
   onPosted: (m: SharedPlan["messages"]) => void;
   id: string;
 }) {
@@ -324,6 +349,8 @@ function SharedReelScreen({
               isOwner={isOwner}
               heading={heading}
               onAccept={onAccept}
+              onEditDate={onEditDate}
+              onDelete={onDelete}
               onPosted={onPosted}
               id={id}
             />
@@ -496,6 +523,8 @@ function SharedDetails({
   isOwner,
   heading,
   onAccept,
+  onEditDate,
+  onDelete,
   onPosted,
   id,
 }: {
@@ -504,6 +533,8 @@ function SharedDetails({
   isOwner: boolean;
   heading: string;
   onAccept: () => void;
+  onEditDate: (d: string) => void;
+  onDelete: () => void;
   onPosted: (m: SharedPlan["messages"]) => void;
   id: string;
 }) {
@@ -524,6 +555,24 @@ function SharedDetails({
           Tweak anything you like, then say yes 💗.
         </p>
       )}
+
+      {/* When — either side can propose / change the actual date */}
+      <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+        <div>
+          <p className="[font-family:var(--font-mono)] text-[9px] uppercase tracking-widest text-white/45">
+            When
+          </p>
+          <p className="text-sm font-semibold">
+            {plan.date ? fmtDate(plan.date) : "Not set yet"}
+          </p>
+        </div>
+        <input
+          type="date"
+          value={plan.date ?? ""}
+          onChange={(e) => onEditDate(e.target.value)}
+          className="rounded-lg border border-white/15 bg-white/[0.04] px-3 py-1.5 text-sm text-white [color-scheme:dark]"
+        />
+      </div>
 
       <div className="mt-4">
         <StatusStrip plan={plan} isOwner={isOwner} />
@@ -554,6 +603,17 @@ function SharedDetails({
       )}
 
       <MessageThread plan={plan} isReal={isReal} isOwner={isOwner} onPosted={onPosted} id={id} />
+
+      {isOwner && (
+        <button
+          onClick={() => {
+            if (window.confirm("Remove this plan for good? This can't be undone.")) onDelete();
+          }}
+          className="mt-6 w-full rounded-full border border-red-500/30 py-2.5 text-sm font-semibold text-red-400 transition hover:bg-red-500/10"
+        >
+          Remove this plan
+        </button>
+      )}
 
       <p className="mt-6 text-center text-xs text-white/50">
         Want to plan your own?{" "}

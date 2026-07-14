@@ -303,6 +303,32 @@ export async function saveSharedSteps(
   return !error;
 }
 
+// Either side proposes / changes the actual date (when). Both can edit (the
+// update policy is capability-based), so the recipient can suggest a day too.
+export async function updateSharedDate(
+  id: string,
+  planDate: string,
+  actorName: string,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("shared_plans")
+    .update({
+      plan_date: planDate || null,
+      status: "changed",
+      last_actor: actorName,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (!error) void notifyOther(id, "change");
+  return !error;
+}
+
+// Owner removes a shared plan entirely (RLS: only the owner can delete).
+export async function deleteSharedPlan(id: string): Promise<boolean> {
+  const { error } = await supabase.from("shared_plans").delete().eq("id", id);
+  return !error;
+}
+
 // Recipient accepts the plan.
 export async function acceptSharedPlan(id: string): Promise<boolean> {
   const me = await whoAmI();
