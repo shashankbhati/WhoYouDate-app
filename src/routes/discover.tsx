@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useStore } from "@/lib/datedata/store";
-import { useCountry } from "@/lib/country";
+import { getCountry } from "@/lib/country";
+import { COUNTRY_CONFIG, type CountryCode } from "@/lib/datedata/countries";
 
 export const Route = createFileRoute("/discover")({
   head: () => ({
@@ -11,23 +12,32 @@ export const Route = createFileRoute("/discover")({
       {
         name: "description",
         content:
-          "Search any first name to see what the community really spends on dates — and the costliest names of all.",
+          "Search any first name to see what the community really spends on dates, in which cities — and the costliest names.",
       },
     ],
   }),
   component: Discover,
 });
 
+const TABS: CountryCode[] = ["all", "DE", "IN", "US"];
+
 function Discover() {
   const { entries } = useStore();
-  const { config } = useCountry();
-  const sym = config.currencySymbol;
+  const [cc, setCc] = useState<CountryCode>(() => getCountry());
   const [q, setQ] = useState("");
+  const cfg = COUNTRY_CONFIG[cc];
+  const sym = cfg.currencySymbol;
 
-  // Aggregate real community entries by first name — averages, sample, 2nd-date rate.
+  // Scope entries to the selected country by its cities ("all" = no filter).
+  const scoped = useMemo(() => {
+    if (cc === "all") return entries;
+    const set = new Set(cfg.cities.map((c) => c.toLowerCase()));
+    return entries.filter((e) => set.has(e.city.trim().toLowerCase()));
+  }, [entries, cc, cfg.cities]);
+
   const byName = useMemo(() => {
     const m = new Map<string, { total: number; n: number; second: number }>();
-    for (const e of entries) {
+    for (const e of scoped) {
       const key = e.partnerName.trim();
       if (!key) continue;
       const cur = m.get(key) ?? { total: 0, n: 0, second: 0 };
@@ -37,7 +47,7 @@ function Discover() {
       m.set(key, cur);
     }
     return m;
-  }, [entries]);
+  }, [scoped]);
 
   const costliest = useMemo(
     () =>
@@ -56,25 +66,34 @@ function Discover() {
     let total = 0,
       n = 0,
       second = 0;
-    for (const [k, v] of byName) {
-      if (k.toLowerCase() === name) {
-        total += v.total;
-        n += v.n;
-        second += v.second;
-      }
+    const cities = new Map<string, { total: number; n: number }>();
+    for (const e of scoped) {
+      if (e.partnerName.trim().toLowerCase() !== name) continue;
+      total += e.amountCents;
+      n += 1;
+      if (e.secondDate && e.secondDate !== "no") second += 1;
+      const cur = cities.get(e.city) ?? { total: 0, n: 0 };
+      cur.total += e.amountCents;
+      cur.n += 1;
+      cities.set(e.city, cur);
     }
     if (n === 0) return { found: false as const };
+    const topCities = [...cities.entries()]
+      .map(([city, v]) => ({ city, avg: Math.round(v.total / v.n / 100), n: v.n }))
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 4);
     return {
       found: true as const,
       avg: Math.round(total / n / 100),
       n,
       secondPct: Math.round((second / n) * 100),
+      topCities,
     };
-  }, [q, byName]);
+  }, [q, scoped]);
 
   return (
     <AppShell>
-      <div className="px-5 py-6 pt-safe text-white">
+      <div className="px-5 py-6 text-white">
         <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/45">
           Discover
         </p>
@@ -82,31 +101,69 @@ function Discover() {
           What dating really costs
         </h1>
         <p className="mt-1 text-sm text-white/55">
-          Search any first name — see what the community actually spends.
+          Search any first name — see what the community actually spends, and where.
         </p>
 
-        {/* Name lookup */}
-        <div className="mt-5 flex gap-2">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Type a first name…"
-            className="flex-1 rounded-full border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
-          />
+        {/* Country switcher */}
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+          {TABS.map((code) => (
+            <button
+              key={code}
+              onClick={() => setCc(code)}
+              className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+                cc === code
+                  ? "bg-white text-neutral-950"
+                  : "border border-white/15 bg-white/[0.04] text-white/70"
+              }`}
+            >
+              {COUNTRY_CONFIG[code].flag} {COUNTRY_CONFIG[code].label}
+            </button>
+          ))}
         </div>
+
+        {/* Name lookup */}
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Type a first name…"
+          className="mt-4 w-full rounded-full border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
+        />
 
         {result && (
           <div className="mt-3 rounded-3xl border border-white/10 bg-[color:var(--color-reel-surface)] p-5">
             {result.found ? (
               <>
                 <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/45">
-                  Dating {q.trim()}
+                  Dating {q.trim()} · {cfg.label}
                 </p>
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   <Mini label="Avg spend" value={`${sym}${result.avg}`} accent />
                   <Mini label="Dates" value={String(result.n)} />
                   <Mini label="2nd date" value={`${result.secondPct}%`} />
                 </div>
+                {result.topCities.length > 0 && (
+                  <div className="mt-3">
+                    <p className="[font-family:var(--font-mono)] mb-1.5 text-[9px] uppercase tracking-widest text-white/40">
+                      Logged most in
+                    </p>
+                    <div className="space-y-1.5">
+                      {result.topCities.map((c) => (
+                        <div key={c.city} className="flex items-center justify-between text-sm">
+                          <span className="text-white/85">
+                            📍 {c.city}{" "}
+                            <span className="text-white/40">
+                              · {c.n} date{c.n === 1 ? "" : "s"}
+                            </span>
+                          </span>
+                          <span className="font-semibold">
+                            {sym}
+                            {c.avg}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {result.n < 8 && (
                   <p className="mt-3 text-center text-[11px] text-white/40">
                     Thin sample — {result.n} date{result.n === 1 ? "" : "s"} logged so far.
@@ -115,8 +172,8 @@ function Discover() {
               </>
             ) : (
               <p className="text-sm text-white/60">
-                No data yet for <span className="font-semibold text-white">{q.trim()}</span> — be the
-                first to log a date.
+                No data yet for <span className="font-semibold text-white">{q.trim()}</span> in{" "}
+                {cfg.label} — try Global, or be the first to log a date.
               </p>
             )}
           </div>
@@ -124,9 +181,11 @@ function Discover() {
 
         {/* Costliest names */}
         <div className="mt-8">
-          <h2 className="mb-3 text-sm font-bold tracking-tight">💸 Costliest names</h2>
+          <h2 className="mb-3 text-sm font-bold tracking-tight">
+            💸 Costliest names · {cfg.label}
+          </h2>
           {costliest.length === 0 ? (
-            <p className="text-sm text-white/50">Not enough data yet — log some dates to fill this in.</p>
+            <p className="text-sm text-white/50">Not enough data here yet — try Global.</p>
           ) : (
             <div className="space-y-2.5">
               {costliest.map((c, i) => (
