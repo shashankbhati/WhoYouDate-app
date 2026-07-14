@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useStore, addPost, addComment, voteOnPost, getUserId, deletePost, deleteComment, editPost, editComment } from "@/lib/datedata/store";
 import { FEMALE_NAMES_ALL, MALE_NAMES_ALL } from "@/lib/datedata/seed";
 import { ACTIVITY_META } from "@/lib/datedata/types";
@@ -158,12 +158,38 @@ function CompareHook({ entries, currency, currencySymbol }: { entries: ReturnTyp
   );
 }
 
+// Runs the layout effect on the client, no-ops (as an effect) on the server.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+// Is a Supabase session cached in this browser? (synchronous — lets us skip the
+// logged-out-home flash for returning users before auth finishes resolving.)
+function hasCachedSession(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && /^sb-.*-auth-token$/.test(k) && localStorage.getItem(k)) return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 // Logged-in users get the phone-app home (full-screen, over the site chrome —
-// same technique as the plan reel). Logged-out visitors keep the curiosity /
-// SEO home below, untouched.
+// same technique as the plan reel). Logged-out visitors keep the curiosity / SEO
+// home. To avoid the "old home → app" flash on reload, we assume logged-in
+// (before paint) if a session is cached, then correct once auth actually resolves.
 function HomeRoute() {
-  const { isReal } = useAuthState();
-  return isReal ? <AppHome /> : <OGHome />;
+  const { isReal, loading } = useAuthState();
+  const [real, setReal] = useState(false); // matches SSR (logged-out) on first render
+  useIsoLayoutEffect(() => {
+    if (hasCachedSession()) setReal(true);
+  }, []);
+  useEffect(() => {
+    if (!loading) setReal(isReal); // trust real auth once known (handles stale tokens)
+  }, [loading, isReal]);
+  return real ? <AppHome /> : <OGHome />;
 }
 
 function OGHome() {

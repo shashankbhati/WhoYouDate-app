@@ -14,6 +14,16 @@ interface CityPin {
 
 function AutoFit({ pins }: { pins: CityPin[] }) {
   const map = useMap();
+  // Leaflet measures the container on mount; inside the phone frame the size
+  // settles a beat later, so nudge it to recompute (fixes a blank/grey map).
+  useEffect(() => {
+    const t1 = setTimeout(() => map.invalidateSize(), 200);
+    const t2 = setTimeout(() => map.invalidateSize(), 600);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [map]);
   useEffect(() => {
     if (pins.length === 0) return;
     if (pins.length === 1) {
