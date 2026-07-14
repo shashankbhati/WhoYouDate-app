@@ -46,6 +46,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     kind?: string;
     text?: string;
   };
+
+  // Self-test: send a push to the caller's own devices to verify the pipeline.
+  if (kind === "test") {
+    const payload = JSON.stringify({
+      title: "🔔 Notifications are on",
+      body: "You'll be pinged when your date replies, accepts, or reacts.",
+      url: "/dates",
+      tag: "wad-test",
+    });
+    const { data: subs } = await admin
+      .from("push_subscriptions")
+      .select("endpoint, subscription")
+      .eq("user_id", user.id);
+    await Promise.all(
+      (subs || []).map(async (s) => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await webpush.sendNotification(s.subscription as any, payload);
+        } catch (e) {
+          const code = (e as { statusCode?: number })?.statusCode;
+          if (code === 404 || code === 410) {
+            await admin.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+          }
+        }
+      }),
+    );
+    return res.status(200).json({ ok: true, sent: (subs || []).length });
+  }
+
   if (!planId || !kind) return res.status(400).json({ ok: false });
 
   const { data: plan } = await admin

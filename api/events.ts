@@ -28,10 +28,19 @@ function simplify(e: any) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const city = String(req.query.city || "").trim();
   const date = String(req.query.date || "").trim();
+  const country = String(req.query.countryCode || "").trim().toUpperCase();
   if (!KEY) return res.status(200).json({ ok: true, events: [], skipped: "no-key" });
   if (!city) return res.status(400).json({ ok: false, events: [] });
 
-  const params = new URLSearchParams({ apikey: KEY, city, size: "10", sort: "date,asc" });
+  const params = new URLSearchParams({
+    apikey: KEY,
+    city,
+    size: "10",
+    sort: "date,asc",
+    locale: "*", // include local-language events, not just en/US
+  });
+  // Scope to the country (Ticketmaster defaults to US popularity otherwise).
+  if (/^[A-Z]{2}$/.test(country)) params.set("countryCode", country);
   if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     // Local date window (UTC bounds are close enough for suggestion purposes).
     params.set("startDateTime", `${date}T00:00:00Z`);

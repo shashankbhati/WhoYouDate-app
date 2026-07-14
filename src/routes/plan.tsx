@@ -14,7 +14,7 @@ import { nameSignal } from "@/lib/dateplan/nameStats";
 import { getWeather } from "@/lib/dateplan/weather";
 import { hasCuratedTemplate } from "@/lib/dateplan/templates";
 import { fmtMoney } from "@/lib/dateplan/cost";
-import { getCountryConfig } from "@/lib/country";
+import { getCountryConfig, getCountry } from "@/lib/country";
 import {
   TIME_META,
   type TimeOfDay,
@@ -441,8 +441,10 @@ function EventsCard({ city, date }: { city: string; date: string }) {
       return;
     }
     let alive = true;
+    const cc = getCountry(); // "all" | "DE" | "IN" | "US"
+    const ccParam = cc && cc !== "all" ? `&countryCode=${cc}` : "";
     const t = setTimeout(() => {
-      fetch(`/api/events?city=${encodeURIComponent(c)}&date=${encodeURIComponent(date)}`)
+      fetch(`/api/events?city=${encodeURIComponent(c)}&date=${encodeURIComponent(date)}${ccParam}`)
         .then((r) => r.json())
         .then((d) => {
           if (alive) {

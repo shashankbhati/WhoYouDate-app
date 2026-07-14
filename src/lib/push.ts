@@ -63,6 +63,29 @@ export async function enablePush(): Promise<{ ok: boolean; error?: string }> {
   }
 }
 
+// Send a push to your own devices — verifies the full pipeline (VAPID keys +
+// subscription + service worker) without needing a second person.
+export async function sendTestPush(): Promise<{ ok: boolean; sent: number }> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return { ok: false, sent: 0 };
+    const r = await fetch("/api/notify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ kind: "test" }),
+    });
+    const d = (await r.json().catch(() => ({}))) as { ok?: boolean; sent?: number };
+    return { ok: !!d.ok, sent: d.sent ?? 0 };
+  } catch {
+    return { ok: false, sent: 0 };
+  }
+}
+
 export async function disablePush(): Promise<void> {
   if (!pushSupported()) return;
   try {

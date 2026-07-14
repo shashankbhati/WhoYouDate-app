@@ -4,7 +4,7 @@ import { useStore, saveProfile, getUserId } from "@/lib/datedata/store";
 import { ACTIVITY_META, type AgeRange, type Profile } from "@/lib/datedata/types";
 import { BADGES, earnedBadges } from "@/lib/datedata/badges";
 import { useAuthState, openAuthModal, updatePassword } from "@/lib/auth";
-import { pushSupported, isPushEnabled, enablePush, disablePush } from "@/lib/push";
+import { pushSupported, isPushEnabled, enablePush, disablePush, sendTestPush } from "@/lib/push";
 import { AppShell } from "@/components/AppShell";
 import { Settings, Share2, Check, ExternalLink, Mail, KeyRound } from "lucide-react";
 import { toast } from "sonner";
@@ -346,25 +346,39 @@ function PushToggle() {
     setBusy(false);
   }
 
+  async function test() {
+    const r = await sendTestPush();
+    if (r.ok && r.sent > 0) toast.success("Test sent 🔔 — check your notifications");
+    else if (r.ok) toast.error("No device subscribed — turn it off and on again.");
+    else toast.error("Couldn't send — check the server VAPID keys are set.");
+  }
+
   return (
-    <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
-      <div className="min-w-0">
-        <p className="text-sm font-semibold">Push notifications</p>
-        <p className="text-xs text-muted-foreground">
-          Get pinged when your date replies, accepts, or reacts.
-        </p>
+    <div className="mt-5 border-t border-border pt-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">Push notifications</p>
+          <p className="text-xs text-muted-foreground">
+            Get pinged when your date replies, accepts, or reacts.
+          </p>
+        </div>
+        <button
+          onClick={toggle}
+          disabled={busy}
+          className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition disabled:opacity-60 ${
+            enabled
+              ? "border border-border text-foreground hover:bg-muted"
+              : "bg-primary text-primary-foreground hover:opacity-90"
+          }`}
+        >
+          {busy ? "…" : enabled ? "On" : "Enable"}
+        </button>
       </div>
-      <button
-        onClick={toggle}
-        disabled={busy}
-        className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition disabled:opacity-60 ${
-          enabled
-            ? "border border-border text-foreground hover:bg-muted"
-            : "bg-primary text-primary-foreground hover:opacity-90"
-        }`}
-      >
-        {busy ? "…" : enabled ? "On" : "Enable"}
-      </button>
+      {enabled && (
+        <button onClick={test} className="mt-2 text-xs text-muted-foreground underline">
+          Send a test notification
+        </button>
+      )}
     </div>
   );
 }
