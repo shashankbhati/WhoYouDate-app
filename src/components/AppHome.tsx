@@ -4,6 +4,7 @@ import { AppShell, AppLoading } from "./AppShell";
 import { useStore } from "@/lib/datedata/store";
 import { useCountry } from "@/lib/country";
 import { useSharedInbox } from "@/lib/dateplan/inbox";
+import { useCouplesMode } from "@/lib/useCouplesMode";
 import { ACTIVITY_META } from "@/lib/datedata/types";
 import type { SharedPlan } from "@/lib/dateplan/share";
 
@@ -83,18 +84,54 @@ export function AppHome() {
     [entries],
   );
 
+  // Couples mode — warmer skin + a couple header, wired to real data.
+  const { couples, mounted, toggle } = useCouplesMode();
+  const partner = profile?.partnerDisplayName?.trim() || "your partner";
+  const monthMine = useMemo(() => {
+    const now = new Date();
+    return mine.filter((e) => {
+      const d = new Date(e.createdAt);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+  }, [mine]);
+  const spentThisMonth = monthMine.reduce((a, e) => a + e.amountCents, 0);
+
   if (!profileChecked || inboxLoading) return <AppLoading />;
 
   return (
     <AppShell>
-      <div className="px-5 pt-safe">
-        <div className="pt-5">
-          <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/45">
-            {greeting()}, {myName}
-          </p>
-          <h1 className="[font-family:var(--font-display)] mt-1 text-4xl tracking-wide">{city}</h1>
+      {couples && (
+        <div
+          className="pointer-events-none fixed inset-0 z-0 opacity-70"
+          style={{
+            background:
+              "radial-gradient(ellipse at 20% -10%, color-mix(in oklab, var(--color-couple-peach) 20%, transparent), transparent 55%), radial-gradient(ellipse at 90% 8%, color-mix(in oklab, var(--color-couple-plum) 24%, transparent), transparent 60%)",
+          }}
+        />
+      )}
+
+      {mounted && <ModePill couples={couples} onToggle={toggle} />}
+
+      {couples ? (
+        <CoupleHeader
+          myName={myName}
+          partner={partner}
+          datesThisMonth={monthMine.length}
+          spentThisMonth={spentThisMonth}
+          secondPct={secondPct}
+          hasDates={mine.length > 0}
+          sym={sym}
+        />
+      ) : (
+        <div className="px-5 pt-safe">
+          <div className="pt-5">
+            <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/45">
+              {greeting()}, {myName}
+            </p>
+            <h1 className="[font-family:var(--font-display)] mt-1 text-4xl tracking-wide">{city}</h1>
+          </div>
         </div>
-      </div>
+      )}
 
       <FocusCard focus={focus} uid={userId} myName={myName} />
 
@@ -418,6 +455,165 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
       <div className={`mt-0.5 text-lg font-bold ${accent ? "text-[color:var(--color-reel-rose)]" : ""}`}>
         {value}
       </div>
+    </div>
+  );
+}
+
+function ModePill({ couples, onToggle }: { couples: boolean; onToggle: () => void }) {
+  return (
+    <div className="relative z-10 flex justify-center px-5 pt-3">
+      <button
+        onClick={onToggle}
+        aria-label="Toggle relationship mode"
+        className="inline-flex items-center gap-1 rounded-full border border-white/12 bg-white/[0.04] p-0.5 text-[10px] uppercase tracking-[0.22em]"
+      >
+        <span
+          className="rounded-full px-3 py-1.5 transition-colors"
+          style={
+            !couples
+              ? { background: "var(--color-reel-rose)", color: "#000" }
+              : { color: "rgba(255,255,255,0.55)" }
+          }
+        >
+          I'm dating
+        </span>
+        <span
+          className="rounded-full px-3 py-1.5 transition-colors"
+          style={
+            couples
+              ? { background: "var(--color-couple-peach)", color: "#1a0d0a" }
+              : { color: "rgba(255,255,255,0.55)" }
+          }
+        >
+          We're together
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function CoupleHeader({
+  myName,
+  partner,
+  datesThisMonth,
+  spentThisMonth,
+  secondPct,
+  hasDates,
+  sym,
+}: {
+  myName: string;
+  partner: string;
+  datesThisMonth: number;
+  spentThisMonth: number;
+  secondPct: number;
+  hasDates: boolean;
+  sym: string;
+}) {
+  return (
+    <div className="relative z-10">
+      <div className="px-5 pt-4">
+        <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/50">
+          {greeting()}, us
+        </p>
+        <h1 className="[font-family:var(--font-display)] mt-0.5 text-3xl tracking-wide">
+          You &amp; {partner}
+        </h1>
+      </div>
+
+      {/* Us hero */}
+      <section className="mt-4 px-5">
+        <div
+          className="relative overflow-hidden rounded-[28px] border p-5"
+          style={{
+            borderColor: "color-mix(in oklab, var(--color-couple-peach) 30%, transparent)",
+            background:
+              "linear-gradient(135deg, color-mix(in oklab, var(--color-couple-peach) 20%, transparent) 0%, color-mix(in oklab, var(--color-couple-plum) 20%, transparent) 60%, transparent 100%)",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex -space-x-3">
+              <div
+                className="grid size-14 place-items-center rounded-full border-2 border-black/40 [font-family:var(--font-display)] text-xl"
+                style={{ background: "var(--color-couple-plum)", color: "#fff" }}
+              >
+                {(myName[0] ?? "Y").toUpperCase()}
+              </div>
+              <div
+                className="grid size-14 place-items-center rounded-full border-2 border-black/40 [font-family:var(--font-display)] text-xl text-black"
+                style={{ background: "var(--color-couple-peach)" }}
+              >
+                {(partner[0] ?? "P").toUpperCase()}
+              </div>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] uppercase tracking-[0.28em] text-white/60">
+                the two of you
+              </div>
+              <div className="[font-family:var(--font-display)] truncate text-2xl leading-none tracking-wide">
+                You &amp; {partner}
+              </div>
+            </div>
+          </div>
+
+          {/* Real couple stats, this month */}
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            <UsStat k="dates / mo" v={String(datesThisMonth)} hot />
+            <UsStat k="spent / mo" v={`${sym}${Math.round(spentThisMonth / 100)}`} />
+            <UsStat k="2nd-date" v={hasDates ? `${secondPct}%` : "—"} />
+          </div>
+
+          {/* Pairing teaser (Phase B) */}
+          <button className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-white/15 bg-black/25 px-4 py-3 text-left">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">Pair up with {partner} 🔗</p>
+              <p className="text-[11px] text-white/55">Together-since + a shareable couple code</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[9px] uppercase tracking-widest text-white/60">
+              soon
+            </span>
+          </button>
+        </div>
+      </section>
+
+      {/* Question of the day teaser (Phase C) */}
+      <section className="mt-4 px-5">
+        <div
+          className="rounded-[24px] border p-5"
+          style={{
+            borderColor: "color-mix(in oklab, var(--color-couple-gold) 26%, transparent)",
+            background: "color-mix(in oklab, var(--color-couple-gold) 7%, transparent)",
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/55">
+              Question of the day
+            </p>
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] uppercase tracking-widest text-white/60">
+              soon
+            </span>
+          </div>
+          <p className="[font-family:var(--font-serif)] mt-2 text-lg italic leading-snug text-white/85">
+            &ldquo;One tiny thing they did this week that you&apos;d never say out loud?&rdquo;
+          </p>
+          <p className="mt-2 text-[11px] text-white/45">
+            A daily question you both answer — the reveal unlocks when you&apos;re both in.
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function UsStat({ k, v, hot }: { k: string; v: string; hot?: boolean }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 px-2 py-3 text-center">
+      <div
+        className="[font-family:var(--font-display)] text-xl"
+        style={hot ? { color: "var(--color-couple-peach)" } : undefined}
+      >
+        {v}
+      </div>
+      <div className="mt-1 text-[9px] uppercase tracking-widest text-white/45">{k}</div>
     </div>
   );
 }

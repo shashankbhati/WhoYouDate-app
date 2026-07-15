@@ -5,6 +5,7 @@ import { ACTIVITY_META, type AgeRange, type Profile } from "@/lib/datedata/types
 import { BADGES, earnedBadges } from "@/lib/datedata/badges";
 import { useAuthState, openAuthModal, updatePassword } from "@/lib/auth";
 import { pushSupported, isPushEnabled, enablePush, disablePush, sendTestPush } from "@/lib/push";
+import { useCouplesMode } from "@/lib/useCouplesMode";
 import { AppShell, AppLoading } from "@/components/AppShell";
 import { Settings, Share2, Check, ExternalLink, Mail, KeyRound } from "lucide-react";
 import { toast } from "sonner";
@@ -80,6 +81,8 @@ function ProfilePage() {
       <h1 className="[font-family:var(--font-display)] mt-1 text-3xl tracking-wide">
         {profile?.displayName ?? draft.displayName}
       </h1>
+
+      <RelationshipToggle />
 
       <div className="mt-8 grid gap-6">
         {/* Left: recent dates + badges */}
@@ -214,6 +217,47 @@ function ProfilePage() {
       </div>
       </div>
     </AppShell>
+  );
+}
+
+// Dating ⇄ couples mode. Writes the real profile relationshipStage (+ instant
+// localStorage) via useCouplesMode.
+function RelationshipToggle() {
+  const { couples, mounted, setCouples } = useCouplesMode();
+  if (!mounted) return null;
+  return (
+    <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <p className="text-sm font-semibold">Relationship</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {couples
+          ? "Couples mode is on — warmer colours, shared plans, gentler copy."
+          : "Switch on when you're seeing someone exclusively."}
+      </p>
+      <div className="mt-3 inline-flex rounded-full border border-white/12 bg-white/[0.04] p-0.5 text-[11px] uppercase tracking-[0.18em]">
+        <button
+          onClick={() => setCouples(false)}
+          className="rounded-full px-4 py-1.5 transition-colors"
+          style={
+            !couples
+              ? { background: "var(--color-reel-rose)", color: "#000" }
+              : { color: "rgba(255,255,255,0.55)" }
+          }
+        >
+          I'm dating
+        </button>
+        <button
+          onClick={() => setCouples(true)}
+          className="rounded-full px-4 py-1.5 transition-colors"
+          style={
+            couples
+              ? { background: "var(--color-couple-peach)", color: "#1a0d0a" }
+              : { color: "rgba(255,255,255,0.55)" }
+          }
+        >
+          We're together
+        </button>
+      </div>
+    </div>
   );
 }
 

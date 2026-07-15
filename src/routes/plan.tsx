@@ -25,6 +25,7 @@ import {
   type Move,
 } from "@/lib/dateplan/types";
 import { JourneyMap } from "@/components/JourneyMap";
+import { useCouplesMode } from "@/lib/useCouplesMode";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/plan")({
@@ -97,6 +98,7 @@ function PlanPage() {
   const [budget, setBudget] = useState<Budget>("comfortable");
   const [durationHours, setDurationHours] = useState(4);
 
+  const { couples } = useCouplesMode();
   const [plan, setPlan] = useState<DatePlan | null>(null);
   const [building, setBuilding] = useState(false);
   const [mode, setMode] = useState<"setup" | "reel">("setup"); // setup card → full reel
@@ -237,10 +239,10 @@ function PlanPage() {
           {/* Header — now inside the design */}
           <div>
             <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.25em] text-white/40">
-              Plan a date · 30 seconds
+              {couples ? "Date night · 30 seconds" : "Plan a date · 30 seconds"}
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-balance">
-              Plan a date they'll say yes to.
+              {couples ? "Plan your next date night." : "Plan a date they'll say yes to."}
             </h1>
             <p className="mt-1 text-sm text-white/60">
               Tell me who, where, and the vibe — I'll map the whole night, ready to share.

@@ -30,6 +30,11 @@
   --color-reel-surface: oklch(0.19 0.008 260);
   --color-reel-rose: oklch(0.7 0.2 15);
   --color-reel-rose-soft: oklch(0.35 0.11 15);
+  /* Couples-mode palette (warm) */
+  --color-couple-peach: oklch(0.78 0.14 45);
+  --color-couple-gold: oklch(0.82 0.14 80);
+  --color-couple-plum: oklch(0.5 0.13 340);
+  --color-couple-blush: oklch(0.75 0.09 20);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
