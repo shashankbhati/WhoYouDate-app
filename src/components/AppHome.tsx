@@ -13,6 +13,7 @@ import {
   unpair,
   type Couple,
 } from "@/lib/couple";
+import { todaysQuestion, useQotd, submitAnswer } from "@/lib/qotd";
 import { ACTIVITY_META } from "@/lib/datedata/types";
 import type { SharedPlan } from "@/lib/dateplan/share";
 import { toast } from "sonner";
@@ -612,32 +613,133 @@ function CoupleHeader({
         </div>
       </section>
 
-      {/* Question of the day teaser (Phase C) */}
-      <section className="mt-4 px-5">
-        <div
-          className="rounded-[24px] border p-5"
-          style={{
-            borderColor: "color-mix(in oklab, var(--color-couple-gold) 26%, transparent)",
-            background: "color-mix(in oklab, var(--color-couple-gold) 7%, transparent)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/55">
-              Question of the day
-            </p>
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] uppercase tracking-widest text-white/60">
-              soon
-            </span>
-          </div>
-          <p className="[font-family:var(--font-serif)] mt-2 text-lg italic leading-snug text-white/85">
-            &ldquo;One tiny thing they did this week that you&apos;d never say out loud?&rdquo;
-          </p>
-          <p className="mt-2 text-[11px] text-white/45">
-            A daily question you both answer — the reveal unlocks when you&apos;re both in.
-          </p>
-        </div>
-      </section>
+      {paired ? (
+        <QotDCard coupleId={couple!.id} myId={myId} partnerName={partnerName} />
+      ) : (
+        <QotDTeaser />
+      )}
     </div>
+  );
+}
+
+const GOLD_CARD = {
+  borderColor: "color-mix(in oklab, var(--color-couple-gold) 26%, transparent)",
+  background: "color-mix(in oklab, var(--color-couple-gold) 7%, transparent)",
+} as const;
+
+function QotDTeaser() {
+  return (
+    <section className="mt-4 px-5">
+      <div className="rounded-[24px] border p-5" style={GOLD_CARD}>
+        <div className="flex items-center justify-between">
+          <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/55">
+            Question of the day
+          </p>
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] uppercase tracking-widest text-white/60">
+            pair up
+          </span>
+        </div>
+        <p className="[font-family:var(--font-serif)] mt-2 text-lg italic leading-snug text-white/85">
+          &ldquo;One tiny thing they did this week that you&apos;d never say out loud?&rdquo;
+        </p>
+        <p className="mt-2 text-[11px] text-white/45">
+          A daily question you both answer — pair up above to start the streak.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// The real daily loop, once paired: answer to unlock your partner's answer.
+function QotDCard({
+  coupleId,
+  myId,
+  partnerName,
+}: {
+  coupleId: string;
+  myId: string;
+  partnerName: string;
+}) {
+  const q = todaysQuestion();
+  const { loading, mine, partner, partnerAnswered, streak, reload } = useQotd(coupleId, myId);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    const t = draft.trim();
+    if (!t) return;
+    setBusy(true);
+    const ok = await submitAnswer(coupleId, t);
+    setBusy(false);
+    if (ok) {
+      setDraft("");
+      reload();
+    } else toast.error("Couldn't save — try again.");
+  }
+
+  return (
+    <section className="mt-4 px-5">
+      <div className="rounded-[24px] border p-5" style={GOLD_CARD}>
+        <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/55">
+          Question of the day{streak > 0 ? ` · ${streak}-day streak 🔥` : ""}
+        </p>
+        <p className="[font-family:var(--font-serif)] mt-2 text-lg italic leading-snug text-white/90">
+          &ldquo;{q.text}&rdquo;
+        </p>
+
+        {loading ? (
+          <p className="mt-3 text-sm text-white/40">…</p>
+        ) : !mine ? (
+          <div className="mt-3">
+            {partnerAnswered && (
+              <p className="mb-2 text-[11px]" style={{ color: "var(--color-couple-peach)" }}>
+                {partnerName} answered · your turn to unlock theirs 🔓
+              </p>
+            )}
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value.slice(0, 300))}
+              placeholder="your answer, just for you two…"
+              rows={2}
+              className="w-full resize-none rounded-2xl border border-white/12 bg-black/25 px-3.5 py-2.5 text-sm text-white placeholder:text-white/35 focus:outline-none"
+            />
+            <button
+              onClick={submit}
+              disabled={busy || !draft.trim()}
+              className="mt-2 w-full rounded-full py-2.5 text-sm font-semibold text-neutral-950 transition active:scale-[0.99] disabled:opacity-50"
+              style={{ background: "var(--color-couple-gold)" }}
+            >
+              {busy ? "…" : "Answer"}
+            </button>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-2">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              <p className="text-[9px] uppercase tracking-widest text-white/45">You said</p>
+              <p className="mt-1 text-sm text-white/90">{mine}</p>
+            </div>
+            {partner ? (
+              <div
+                className="rounded-2xl border p-3"
+                style={{
+                  borderColor: "color-mix(in oklab, var(--color-couple-peach) 30%, transparent)",
+                  background: "color-mix(in oklab, var(--color-couple-peach) 10%, transparent)",
+                }}
+              >
+                <p className="text-[9px] uppercase tracking-widest text-white/55">
+                  {partnerName} said
+                </p>
+                <p className="mt-1 text-sm text-white/90">{partner}</p>
+              </div>
+            ) : (
+              <p className="text-center text-[11px] text-white/45">
+                Answered ✓ — waiting for {partnerName} to answer…
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

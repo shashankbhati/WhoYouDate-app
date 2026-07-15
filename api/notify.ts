@@ -75,6 +75,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true, sent: (subs || []).length });
   }
 
+  // Question of the Day — notify the caller's partner that they answered.
+  if (kind === "qotd") {
+    const { data: couple } = await admin
+      .from("couples")
+      .select("member_a, member_b, member_a_name, member_b_name")
+      .or(`member_a.eq.${user.id},member_b.eq.${user.id}`)
+      .maybeSingle();
+    if (!couple) return res.status(200).json({ ok: true, skipped: "no-couple" });
+    const targetId = couple.member_a === user.id ? couple.member_b : couple.member_a;
+    const myName = couple.member_a === user.id ? couple.member_a_name : couple.member_b_name;
+    if (!targetId) return res.status(200).json({ ok: true, skipped: "no-partner" });
+    const payload = JSON.stringify({
+      title: `${myName || "Your partner"} answered today 💬`,
+      body: "Answer today's question to unlock theirs.",
+      url: "/",
+      tag: "qotd",
+    });
+    const { data: subs } = await admin
+      .from("push_subscriptions")
+      .select("endpoint, subscription")
+      .eq("user_id", targetId);
+    await Promise.all(
+      (subs || []).map(async (s) => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await webpush.sendNotification(s.subscription as any, payload);
+        } catch (e) {
+          const code = (e as { statusCode?: number })?.statusCode;
+          if (code === 404 || code === 410) {
+            await admin.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+          }
+        }
+      }),
+    );
+    return res.status(200).json({ ok: true, sent: (subs || []).length });
+  }
+
   if (!planId || !kind) return res.status(400).json({ ok: false });
 
   const { data: plan } = await admin
