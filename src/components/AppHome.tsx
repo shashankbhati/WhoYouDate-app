@@ -5,18 +5,9 @@ import { useStore } from "@/lib/datedata/store";
 import { useCountry } from "@/lib/country";
 import { useSharedInbox } from "@/lib/dateplan/inbox";
 import { useCouplesMode } from "@/lib/useCouplesMode";
-import {
-  useCouple,
-  createCouple,
-  joinCouple,
-  updateTogetherSince,
-  unpair,
-  type Couple,
-} from "@/lib/couple";
-import { todaysQuestion, useQotd, submitAnswer } from "@/lib/qotd";
+import { CouplesHome } from "./CouplesHome";
 import { ACTIVITY_META } from "@/lib/datedata/types";
 import type { SharedPlan } from "@/lib/dateplan/share";
-import { toast } from "sonner";
 
 // The logged-in phone-app home: the two-person shared-date loop up top, then your
 // plans, your ledger, a weekly check-in, and fresh local activity. Wired to real
@@ -104,47 +95,36 @@ export function AppHome() {
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
   }, [mine]);
-  const spentThisMonth = monthMine.reduce((a, e) => a + e.amountCents, 0);
 
   if (!profileChecked || inboxLoading) return <AppLoading />;
 
   return (
     <AppShell>
-      {couples && (
-        <div
-          className="pointer-events-none fixed inset-0 z-0 opacity-70"
-          style={{
-            background:
-              "radial-gradient(ellipse at 20% -10%, color-mix(in oklab, var(--color-couple-peach) 20%, transparent), transparent 55%), radial-gradient(ellipse at 90% 8%, color-mix(in oklab, var(--color-couple-plum) 24%, transparent), transparent 60%)",
-          }}
-        />
-      )}
-
       {mounted && <ModePill couples={couples} onToggle={toggle} />}
 
       {couples ? (
-        <CoupleHeader
+        <CouplesHome
           myName={myName}
           myId={userId}
           partnerFallback={partner}
-          datesThisMonth={monthMine.length}
-          spentThisMonth={spentThisMonth}
-          secondPct={secondPct}
-          hasDates={mine.length > 0}
+          entries={mine}
+          monthMine={monthMine}
           sym={sym}
         />
       ) : (
-        <div className="px-5 pt-safe">
-          <div className="pt-5">
-            <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/45">
-              {greeting()}, {myName}
-            </p>
-            <h1 className="[font-family:var(--font-display)] mt-1 text-4xl tracking-wide">{city}</h1>
+        <>
+          <div className="px-5 pt-safe">
+            <div className="pt-5">
+              <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/45">
+                {greeting()}, {myName}
+              </p>
+              <h1 className="[font-family:var(--font-display)] mt-1 text-4xl tracking-wide">
+                {city}
+              </h1>
+            </div>
           </div>
-        </div>
-      )}
 
-      <FocusCard focus={focus} uid={userId} myName={myName} />
+          <FocusCard focus={focus} uid={userId} myName={myName} />
 
       {plans.length > 0 && (
         <Section title="Your plans" action={{ label: "Open inbox →", to: "/dates" }}>
@@ -249,6 +229,8 @@ export function AppHome() {
             ))}
           </div>
         </Section>
+      )}
+        </>
       )}
     </AppShell>
   );
@@ -499,388 +481,6 @@ function ModePill({ couples, onToggle }: { couples: boolean; onToggle: () => voi
           We're together
         </span>
       </button>
-    </div>
-  );
-}
-
-function CoupleHeader({
-  myName,
-  myId,
-  partnerFallback,
-  datesThisMonth,
-  spentThisMonth,
-  secondPct,
-  hasDates,
-  sym,
-}: {
-  myName: string;
-  myId: string;
-  partnerFallback: string;
-  datesThisMonth: number;
-  spentThisMonth: number;
-  secondPct: number;
-  hasDates: boolean;
-  sym: string;
-}) {
-  const { couple, loading, reload } = useCouple(true);
-  const paired = !!(couple && couple.memberB);
-  const iAmA = couple?.memberA === myId;
-  const partnerName = paired
-    ? (iAmA ? couple!.memberBName : couple!.memberAName) || "your partner"
-    : partnerFallback;
-  const days = couple?.togetherSince
-    ? Math.max(0, Math.floor((Date.now() - +new Date(`${couple.togetherSince}T00:00:00`)) / 86400000))
-    : null;
-
-  return (
-    <div className="relative z-10">
-      <div className="px-5 pt-4">
-        <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/50">
-          {greeting()}, us
-        </p>
-        <h1 className="[font-family:var(--font-display)] mt-0.5 text-3xl tracking-wide">
-          You &amp; {partnerName}
-        </h1>
-      </div>
-
-      {/* Us hero */}
-      <section className="mt-4 px-5">
-        <div
-          className="relative overflow-hidden rounded-[28px] border p-5"
-          style={{
-            borderColor: "color-mix(in oklab, var(--color-couple-peach) 30%, transparent)",
-            background:
-              "linear-gradient(135deg, color-mix(in oklab, var(--color-couple-peach) 20%, transparent) 0%, color-mix(in oklab, var(--color-couple-plum) 20%, transparent) 60%, transparent 100%)",
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex -space-x-3">
-              <div
-                className="grid size-14 place-items-center rounded-full border-2 border-black/40 [font-family:var(--font-display)] text-xl"
-                style={{ background: "var(--color-couple-plum)", color: "#fff" }}
-              >
-                {(myName[0] ?? "Y").toUpperCase()}
-              </div>
-              <div
-                className="grid size-14 place-items-center rounded-full border-2 border-black/40 [font-family:var(--font-display)] text-xl text-black"
-                style={{ background: "var(--color-couple-peach)" }}
-              >
-                {(partnerName[0] ?? "P").toUpperCase()}
-              </div>
-            </div>
-            <div className="min-w-0 flex-1">
-              {paired && days !== null ? (
-                <>
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-white/60">
-                    together since
-                  </div>
-                  <div className="[font-family:var(--font-display)] text-3xl leading-none tracking-wide">
-                    {days} <span className="text-white/60">days</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-white/60">
-                    the two of you
-                  </div>
-                  <div className="[font-family:var(--font-display)] truncate text-2xl leading-none tracking-wide">
-                    You &amp; {partnerName}
-                  </div>
-                </>
-              )}
-            </div>
-            {couple && <CodeChip code={couple.code} />}
-          </div>
-
-          {/* Real couple stats, this month */}
-          <div className="mt-5 grid grid-cols-3 gap-2">
-            <UsStat k="dates / mo" v={String(datesThisMonth)} hot />
-            <UsStat k="spent / mo" v={`${sym}${Math.round(spentThisMonth / 100)}`} />
-            <UsStat k="2nd-date" v={hasDates ? `${secondPct}%` : "—"} />
-          </div>
-
-          {/* Pairing / paired footer */}
-          {loading ? null : couple ? (
-            <PairedFooter
-              couple={couple}
-              paired={paired}
-              partnerName={partnerName}
-              onChanged={reload}
-            />
-          ) : (
-            <PairUp myName={myName} onDone={reload} />
-          )}
-        </div>
-      </section>
-
-      {paired ? (
-        <QotDCard coupleId={couple!.id} myId={myId} partnerName={partnerName} />
-      ) : (
-        <QotDTeaser />
-      )}
-    </div>
-  );
-}
-
-const GOLD_CARD = {
-  borderColor: "color-mix(in oklab, var(--color-couple-gold) 26%, transparent)",
-  background: "color-mix(in oklab, var(--color-couple-gold) 7%, transparent)",
-} as const;
-
-function QotDTeaser() {
-  return (
-    <section className="mt-4 px-5">
-      <div className="rounded-[24px] border p-5" style={GOLD_CARD}>
-        <div className="flex items-center justify-between">
-          <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/55">
-            Question of the day
-          </p>
-          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] uppercase tracking-widest text-white/60">
-            pair up
-          </span>
-        </div>
-        <p className="[font-family:var(--font-serif)] mt-2 text-lg italic leading-snug text-white/85">
-          &ldquo;One tiny thing they did this week that you&apos;d never say out loud?&rdquo;
-        </p>
-        <p className="mt-2 text-[11px] text-white/45">
-          A daily question you both answer — pair up above to start the streak.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-// The real daily loop, once paired: answer to unlock your partner's answer.
-function QotDCard({
-  coupleId,
-  myId,
-  partnerName,
-}: {
-  coupleId: string;
-  myId: string;
-  partnerName: string;
-}) {
-  const q = todaysQuestion();
-  const { loading, mine, partner, partnerAnswered, streak, reload } = useQotd(coupleId, myId);
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function submit() {
-    const t = draft.trim();
-    if (!t) return;
-    setBusy(true);
-    const ok = await submitAnswer(coupleId, t);
-    setBusy(false);
-    if (ok) {
-      setDraft("");
-      reload();
-    } else toast.error("Couldn't save — try again.");
-  }
-
-  return (
-    <section className="mt-4 px-5">
-      <div className="rounded-[24px] border p-5" style={GOLD_CARD}>
-        <p className="[font-family:var(--font-mono)] text-[10px] uppercase tracking-[0.28em] text-white/55">
-          Question of the day{streak > 0 ? ` · ${streak}-day streak 🔥` : ""}
-        </p>
-        <p className="[font-family:var(--font-serif)] mt-2 text-lg italic leading-snug text-white/90">
-          &ldquo;{q.text}&rdquo;
-        </p>
-
-        {loading ? (
-          <p className="mt-3 text-sm text-white/40">…</p>
-        ) : !mine ? (
-          <div className="mt-3">
-            {partnerAnswered && (
-              <p className="mb-2 text-[11px]" style={{ color: "var(--color-couple-peach)" }}>
-                {partnerName} answered · your turn to unlock theirs 🔓
-              </p>
-            )}
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value.slice(0, 300))}
-              placeholder="your answer, just for you two…"
-              rows={2}
-              className="w-full resize-none rounded-2xl border border-white/12 bg-black/25 px-3.5 py-2.5 text-sm text-white placeholder:text-white/35 focus:outline-none"
-            />
-            <button
-              onClick={submit}
-              disabled={busy || !draft.trim()}
-              className="mt-2 w-full rounded-full py-2.5 text-sm font-semibold text-neutral-950 transition active:scale-[0.99] disabled:opacity-50"
-              style={{ background: "var(--color-couple-gold)" }}
-            >
-              {busy ? "…" : "Answer"}
-            </button>
-          </div>
-        ) : (
-          <div className="mt-3 space-y-2">
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-              <p className="text-[9px] uppercase tracking-widest text-white/45">You said</p>
-              <p className="mt-1 text-sm text-white/90">{mine}</p>
-            </div>
-            {partner ? (
-              <div
-                className="rounded-2xl border p-3"
-                style={{
-                  borderColor: "color-mix(in oklab, var(--color-couple-peach) 30%, transparent)",
-                  background: "color-mix(in oklab, var(--color-couple-peach) 10%, transparent)",
-                }}
-              >
-                <p className="text-[9px] uppercase tracking-widest text-white/55">
-                  {partnerName} said
-                </p>
-                <p className="mt-1 text-sm text-white/90">{partner}</p>
-              </div>
-            ) : (
-              <p className="text-center text-[11px] text-white/45">
-                Answered ✓ — waiting for {partnerName} to answer…
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function CodeChip({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={async () => {
-        try {
-          await navigator.clipboard?.writeText(code);
-        } catch {
-          /* ignore */
-        }
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1400);
-      }}
-      className="shrink-0 rounded-full border border-white/20 bg-black/25 px-2.5 py-1.5 [font-family:var(--font-mono)] text-[10px] tracking-wider"
-      aria-label="Copy couple code"
-    >
-      {copied ? "copied ✓" : code}
-    </button>
-  );
-}
-
-// Footer when a couple exists — waiting for the partner, or fully paired.
-function PairedFooter({
-  couple,
-  paired,
-  partnerName,
-  onChanged,
-}: {
-  couple: Couple;
-  paired: boolean;
-  partnerName: string;
-  onChanged: () => void;
-}) {
-  return (
-    <div className="mt-4 space-y-3">
-      {!paired && (
-        <div className="rounded-2xl border border-white/15 bg-black/25 px-4 py-3 text-sm">
-          <p className="font-semibold">Waiting for them to join 💫</p>
-          <p className="mt-0.5 text-[11px] text-white/55">
-            Share your code <span className="font-mono text-white/80">{couple.code}</span> — they
-            enter it in their app to pair.
-          </p>
-        </div>
-      )}
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="[font-family:var(--font-mono)] text-[9px] uppercase tracking-widest text-white/45">
-            Together since
-          </p>
-          <p className="text-sm font-semibold">
-            {couple.togetherSince ? couple.togetherSince : "Not set"}
-          </p>
-        </div>
-        <input
-          type="date"
-          value={couple.togetherSince ?? ""}
-          onChange={async (e) => {
-            await updateTogetherSince(couple.id, e.target.value);
-            onChanged();
-          }}
-          className="rounded-lg border border-white/15 bg-white/[0.05] px-3 py-1.5 text-sm text-white [color-scheme:dark]"
-        />
-      </div>
-      <button
-        onClick={async () => {
-          if (window.confirm(paired ? `Unpair from ${partnerName}?` : "Cancel pairing?")) {
-            await unpair(couple.id);
-            onChanged();
-          }
-        }}
-        className="text-[11px] text-white/45 underline"
-      >
-        {paired ? "Unpair" : "Cancel"}
-      </button>
-    </div>
-  );
-}
-
-// Footer when there's no couple — create one, or join with a code.
-function PairUp({ myName, onDone }: { myName: string; onDone: () => void }) {
-  const [code, setCode] = useState("");
-  const [busy, setBusy] = useState(false);
-  return (
-    <div className="mt-4 space-y-2">
-      <button
-        onClick={async () => {
-          setBusy(true);
-          const r = await createCouple(myName);
-          setBusy(false);
-          if (r.ok) {
-            toast.success("Couple created — share your code 💞");
-            onDone();
-          } else toast.error(r.error ?? "Couldn't create.");
-        }}
-        disabled={busy}
-        className="w-full rounded-2xl px-4 py-3 text-sm font-semibold text-neutral-950 transition active:scale-[0.99] disabled:opacity-60"
-        style={{ background: "var(--color-couple-peach)" }}
-      >
-        {busy ? "…" : "Pair up — create our couple 🔗"}
-      </button>
-      <div className="flex gap-2">
-        <input
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder="Have a code? e.g. US-7QK2"
-          className="min-w-0 flex-1 rounded-2xl border border-white/12 bg-black/25 px-4 py-2.5 text-sm text-white placeholder:text-white/35 focus:outline-none"
-        />
-        <button
-          onClick={async () => {
-            if (!code.trim()) return;
-            setBusy(true);
-            const r = await joinCouple(code);
-            setBusy(false);
-            if (r.ok) {
-              toast.success("Paired 💞");
-              onDone();
-            } else toast.error(r.error ?? "Couldn't join.");
-          }}
-          disabled={busy || !code.trim()}
-          className="shrink-0 rounded-2xl border border-white/15 px-4 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          Join
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function UsStat({ k, v, hot }: { k: string; v: string; hot?: boolean }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/25 px-2 py-3 text-center">
-      <div
-        className="[font-family:var(--font-display)] text-xl"
-        style={hot ? { color: "var(--color-couple-peach)" } : undefined}
-      >
-        {v}
-      </div>
-      <div className="mt-1 text-[9px] uppercase tracking-widest text-white/45">{k}</div>
     </div>
   );
 }
