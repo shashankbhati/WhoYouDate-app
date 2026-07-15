@@ -39,8 +39,10 @@ export async function getMyCouple(): Promise<Couple | null> {
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
+  // 6 chars over a 32-char alphabet ≈ 1 billion combos — infeasible to brute-force
+  // a stranger's "join by code" while still short enough to share.
   let s = "";
-  for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return `US-${s}`;
 }
 
