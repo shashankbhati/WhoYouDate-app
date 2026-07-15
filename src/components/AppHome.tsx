@@ -5,8 +5,17 @@ import { useStore } from "@/lib/datedata/store";
 import { useCountry } from "@/lib/country";
 import { useSharedInbox } from "@/lib/dateplan/inbox";
 import { useCouplesMode } from "@/lib/useCouplesMode";
+import {
+  useCouple,
+  createCouple,
+  joinCouple,
+  updateTogetherSince,
+  unpair,
+  type Couple,
+} from "@/lib/couple";
 import { ACTIVITY_META } from "@/lib/datedata/types";
 import type { SharedPlan } from "@/lib/dateplan/share";
+import { toast } from "sonner";
 
 // The logged-in phone-app home: the two-person shared-date loop up top, then your
 // plans, your ledger, a weekly check-in, and fresh local activity. Wired to real
@@ -115,7 +124,8 @@ export function AppHome() {
       {couples ? (
         <CoupleHeader
           myName={myName}
-          partner={partner}
+          myId={userId}
+          partnerFallback={partner}
           datesThisMonth={monthMine.length}
           spentThisMonth={spentThisMonth}
           secondPct={secondPct}
@@ -494,7 +504,8 @@ function ModePill({ couples, onToggle }: { couples: boolean; onToggle: () => voi
 
 function CoupleHeader({
   myName,
-  partner,
+  myId,
+  partnerFallback,
   datesThisMonth,
   spentThisMonth,
   secondPct,
@@ -502,13 +513,24 @@ function CoupleHeader({
   sym,
 }: {
   myName: string;
-  partner: string;
+  myId: string;
+  partnerFallback: string;
   datesThisMonth: number;
   spentThisMonth: number;
   secondPct: number;
   hasDates: boolean;
   sym: string;
 }) {
+  const { couple, loading, reload } = useCouple(true);
+  const paired = !!(couple && couple.memberB);
+  const iAmA = couple?.memberA === myId;
+  const partnerName = paired
+    ? (iAmA ? couple!.memberBName : couple!.memberAName) || "your partner"
+    : partnerFallback;
+  const days = couple?.togetherSince
+    ? Math.max(0, Math.floor((Date.now() - +new Date(`${couple.togetherSince}T00:00:00`)) / 86400000))
+    : null;
+
   return (
     <div className="relative z-10">
       <div className="px-5 pt-4">
@@ -516,7 +538,7 @@ function CoupleHeader({
           {greeting()}, us
         </p>
         <h1 className="[font-family:var(--font-display)] mt-0.5 text-3xl tracking-wide">
-          You &amp; {partner}
+          You &amp; {partnerName}
         </h1>
       </div>
 
@@ -542,17 +564,31 @@ function CoupleHeader({
                 className="grid size-14 place-items-center rounded-full border-2 border-black/40 [font-family:var(--font-display)] text-xl text-black"
                 style={{ background: "var(--color-couple-peach)" }}
               >
-                {(partner[0] ?? "P").toUpperCase()}
+                {(partnerName[0] ?? "P").toUpperCase()}
               </div>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-white/60">
-                the two of you
-              </div>
-              <div className="[font-family:var(--font-display)] truncate text-2xl leading-none tracking-wide">
-                You &amp; {partner}
-              </div>
+              {paired && days !== null ? (
+                <>
+                  <div className="text-[10px] uppercase tracking-[0.28em] text-white/60">
+                    together since
+                  </div>
+                  <div className="[font-family:var(--font-display)] text-3xl leading-none tracking-wide">
+                    {days} <span className="text-white/60">days</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-[10px] uppercase tracking-[0.28em] text-white/60">
+                    the two of you
+                  </div>
+                  <div className="[font-family:var(--font-display)] truncate text-2xl leading-none tracking-wide">
+                    You &amp; {partnerName}
+                  </div>
+                </>
+              )}
             </div>
+            {couple && <CodeChip code={couple.code} />}
           </div>
 
           {/* Real couple stats, this month */}
@@ -562,16 +598,17 @@ function CoupleHeader({
             <UsStat k="2nd-date" v={hasDates ? `${secondPct}%` : "—"} />
           </div>
 
-          {/* Pairing teaser (Phase B) */}
-          <button className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-white/15 bg-black/25 px-4 py-3 text-left">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">Pair up with {partner} 🔗</p>
-              <p className="text-[11px] text-white/55">Together-since + a shareable couple code</p>
-            </div>
-            <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[9px] uppercase tracking-widest text-white/60">
-              soon
-            </span>
-          </button>
+          {/* Pairing / paired footer */}
+          {loading ? null : couple ? (
+            <PairedFooter
+              couple={couple}
+              paired={paired}
+              partnerName={partnerName}
+              onChanged={reload}
+            />
+          ) : (
+            <PairUp myName={myName} onDone={reload} />
+          )}
         </div>
       </section>
 
@@ -600,6 +637,134 @@ function CoupleHeader({
           </p>
         </div>
       </section>
+    </div>
+  );
+}
+
+function CodeChip({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={async () => {
+        try {
+          await navigator.clipboard?.writeText(code);
+        } catch {
+          /* ignore */
+        }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1400);
+      }}
+      className="shrink-0 rounded-full border border-white/20 bg-black/25 px-2.5 py-1.5 [font-family:var(--font-mono)] text-[10px] tracking-wider"
+      aria-label="Copy couple code"
+    >
+      {copied ? "copied ✓" : code}
+    </button>
+  );
+}
+
+// Footer when a couple exists — waiting for the partner, or fully paired.
+function PairedFooter({
+  couple,
+  paired,
+  partnerName,
+  onChanged,
+}: {
+  couple: Couple;
+  paired: boolean;
+  partnerName: string;
+  onChanged: () => void;
+}) {
+  return (
+    <div className="mt-4 space-y-3">
+      {!paired && (
+        <div className="rounded-2xl border border-white/15 bg-black/25 px-4 py-3 text-sm">
+          <p className="font-semibold">Waiting for them to join 💫</p>
+          <p className="mt-0.5 text-[11px] text-white/55">
+            Share your code <span className="font-mono text-white/80">{couple.code}</span> — they
+            enter it in their app to pair.
+          </p>
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="[font-family:var(--font-mono)] text-[9px] uppercase tracking-widest text-white/45">
+            Together since
+          </p>
+          <p className="text-sm font-semibold">
+            {couple.togetherSince ? couple.togetherSince : "Not set"}
+          </p>
+        </div>
+        <input
+          type="date"
+          value={couple.togetherSince ?? ""}
+          onChange={async (e) => {
+            await updateTogetherSince(couple.id, e.target.value);
+            onChanged();
+          }}
+          className="rounded-lg border border-white/15 bg-white/[0.05] px-3 py-1.5 text-sm text-white [color-scheme:dark]"
+        />
+      </div>
+      <button
+        onClick={async () => {
+          if (window.confirm(paired ? `Unpair from ${partnerName}?` : "Cancel pairing?")) {
+            await unpair(couple.id);
+            onChanged();
+          }
+        }}
+        className="text-[11px] text-white/45 underline"
+      >
+        {paired ? "Unpair" : "Cancel"}
+      </button>
+    </div>
+  );
+}
+
+// Footer when there's no couple — create one, or join with a code.
+function PairUp({ myName, onDone }: { myName: string; onDone: () => void }) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="mt-4 space-y-2">
+      <button
+        onClick={async () => {
+          setBusy(true);
+          const r = await createCouple(myName);
+          setBusy(false);
+          if (r.ok) {
+            toast.success("Couple created — share your code 💞");
+            onDone();
+          } else toast.error(r.error ?? "Couldn't create.");
+        }}
+        disabled={busy}
+        className="w-full rounded-2xl px-4 py-3 text-sm font-semibold text-neutral-950 transition active:scale-[0.99] disabled:opacity-60"
+        style={{ background: "var(--color-couple-peach)" }}
+      >
+        {busy ? "…" : "Pair up — create our couple 🔗"}
+      </button>
+      <div className="flex gap-2">
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          placeholder="Have a code? e.g. US-7QK2"
+          className="min-w-0 flex-1 rounded-2xl border border-white/12 bg-black/25 px-4 py-2.5 text-sm text-white placeholder:text-white/35 focus:outline-none"
+        />
+        <button
+          onClick={async () => {
+            if (!code.trim()) return;
+            setBusy(true);
+            const r = await joinCouple(code);
+            setBusy(false);
+            if (r.ok) {
+              toast.success("Paired 💞");
+              onDone();
+            } else toast.error(r.error ?? "Couldn't join.");
+          }}
+          disabled={busy || !code.trim()}
+          className="shrink-0 rounded-2xl border border-white/15 px-4 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          Join
+        </button>
+      </div>
     </div>
   );
 }
