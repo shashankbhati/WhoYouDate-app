@@ -154,7 +154,7 @@ export function buildPlan(
   const { aim, maxTier } = BUDGET_META[budget];
 
   // 1) Pick the stops: the budget-shaped arc, truncated to a realistic count.
-  const arc = arcFor(city, timeOfDay, budget);
+  const arc = arcFor(city, timeOfDay, budget, nonce);
   const n = Math.min(stopCount(durationHours), arc.length);
   const chosen: StopSpec[] = arc.slice(0, Math.max(2, n));
 

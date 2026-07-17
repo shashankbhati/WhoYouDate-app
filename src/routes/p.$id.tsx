@@ -112,19 +112,28 @@ function SharedPlanView({ id }: { id: string }) {
   async function swap(stepOrder: number, v: Venue) {
     if (!isReal) return openAuthModal("Sign in to change this plan.");
     if (!plan) return;
+    const oldName = plan.steps.find((s) => s.order === stepOrder)?.venue?.name;
     const steps: SharedStep[] = plan.steps.map((s) => {
       if (s.order !== stepOrder || !s.venue) return s;
-      const oldName = s.venue.name;
+      const on = s.venue.name;
       return {
         ...s,
-        title: s.title.split(oldName).join(v.name),
-        scene: s.scene.split(oldName).join(v.name),
+        title: s.title.split(on).join(v.name),
+        scene: s.scene.split(on).join(v.name),
         venue: { id: v.id, name: v.name, kind: v.kind, area: v.area, rating: v.rating },
       };
     });
     setPlan({ ...plan, steps, status: "changed" });
     const ok = await saveSharedSteps(id, steps, me?.name ?? "Your date");
-    if (!ok) toast.error("Couldn't save the change — try again.");
+    if (!ok) {
+      toast.error("Couldn't save the change — try again.");
+      return;
+    }
+    // Leave a short "what changed" note in the chat so the other side sees it.
+    if (oldName && oldName !== v.name) {
+      const msgs = await postSharedMessage(id, `✏️ swapped ${oldName} → ${v.name}`, isOwner);
+      if (msgs) setPlan((p) => (p ? { ...p, steps, status: "changed", messages: msgs } : p));
+    }
   }
 
   async function react(order: number, emoji: string) {

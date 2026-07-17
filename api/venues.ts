@@ -66,7 +66,7 @@ async function fetchKind(
 ): Promise<KindResult> {
   const url =
     `https://places-api.foursquare.com/places/search?near=${encodeURIComponent(near)}` +
-    `&query=${encodeURIComponent(q.query)}&limit=10` +
+    `&query=${encodeURIComponent(q.query)}&limit=50` +
     `&fields=${encodeURIComponent("name,location,latitude,longitude")}`;
   const res = await fetch(url, {
     headers: {
@@ -207,8 +207,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .ilike("city", cityParam)
     .eq("enabled", true)
     .maybeSingle();
-  if (!cityRow) return res.status(400).json({ error: "City not supported" });
-  const displayCity: string = cityRow.city;
+  // Auto-whitelist any city the user actually plans in: geocode it (server-side
+  // Nominatim) + add it, so new locations get real venues (not just seed places).
+  let row = cityRow;
+  if (!row) {
+    try {
+      const geo = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityParam)}&format=json&limit=1`,
+        { headers: { "User-Agent": "whoamidating.singles/1.0 (venues importer)" } },
+      );
+      const g = await geo.json();
+      if (Array.isArray(g) && g[0]) {
+        const name = cityParam.charAt(0).toUpperCase() + cityParam.slice(1);
+        const lat = parseFloat(g[0].lat);
+        const lon = parseFloat(g[0].lon);
+        const { data: inserted } = await db
+          .from("plan_cities")
+          .insert({ city: name, near: name, lat, lon, enabled: true })
+          .select()
+          .maybeSingle();
+        row = inserted ?? { city: name, near: name, lat, lon, enabled: true };
+      }
+    } catch {
+      /* geocode failed → fall through */
+    }
+  }
+  if (!row) return res.status(400).json({ error: "City not supported" });
+  const displayCity: string = row.city;
 
   // Serve from cache if we already have fresh auto rows for this city.
   const cutoff = new Date(Date.now() - MAX_AGE_MS).toISOString();
@@ -232,9 +257,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     note: "no coords" as string | undefined,
   };
   const [batches, osm] = await Promise.all([
-    Promise.all(KINDS.map((k) => fetchKind(displayCity, cityRow.near, k, fsqKey))),
-    cityRow.lat != null && cityRow.lon != null
-      ? fetchOsm(displayCity, cityRow.lat, cityRow.lon)
+    Promise.all(KINDS.map((k) => fetchKind(displayCity, row.near, k, fsqKey))),
+    row.lat != null && row.lon != null
+      ? fetchOsm(displayCity, row.lat, row.lon)
       : Promise.resolve(emptyOsm),
   ]);
 

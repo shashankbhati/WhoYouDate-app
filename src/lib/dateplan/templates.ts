@@ -231,44 +231,82 @@ const walk = (label: string, q: Stage = "mid"): StopSpec => ({
   indoorSwap: "Duck somewhere cosy and keep talking if the weather turns.",
 });
 
-const GENERIC: Record<TimeOfDay, (b: Budget) => StopSpec[]> = {
-  morning: () => [cafe("Start easy over coffee at {venue}."), walk("Morning", "opener"), dessert()],
-  afternoon: (b) => [
-    cafe("Meet over coffee at {venue}."),
-    walk("Afternoon"),
-    b === "treat" ? activity() : dessert(),
-  ],
-  evening: (b) =>
+// Rotate through arc variants by the plan's seed so "Try another plan" changes
+// the SHAPE (not just the venues) — café→walk→dinner→dessert isn't a must.
+function pick<T>(v: number, arr: T[]): T {
+  return arr[((v % arr.length) + arr.length) % arr.length];
+}
+
+const GENERIC: Record<TimeOfDay, (b: Budget, v: number) => StopSpec[]> = {
+  morning: (b, v) =>
+    pick(v, [
+      [cafe("Start easy over coffee at {venue}."), walk("Morning", "opener"), dessert()],
+      [
+        walk("Morning stroll", "opener"),
+        cafe("Warm up with coffee at {venue}."),
+        b === "treat" ? activity() : dessert(),
+      ],
+      [cafe("Coffee and pastries at {venue}."), activity(), walk("Morning", "late")],
+    ]),
+  afternoon: (b, v) =>
+    pick(v, [
+      [cafe("Meet over coffee at {venue}."), walk("Afternoon"), b === "treat" ? activity() : dessert()],
+      [activity(), cafe("Cool down with coffee at {venue}."), walk("Afternoon", "late")],
+      [
+        walk("Afternoon", "opener"),
+        b === "tight" ? cafe("Coffee at {venue}.") : restaurant(),
+        dessert(),
+      ],
+    ]),
+  evening: (b, v) =>
     b === "tight"
-      ? [bar("Open the evening with drinks at {venue}."), walk("Golden-hour"), dessert()]
+      ? pick(v, [
+          [bar("Open the evening with drinks at {venue}."), walk("Golden-hour"), dessert()],
+          [walk("Golden-hour", "opener"), bar("Drinks at {venue}."), dessert()],
+          [cafe("Coffee to start at {venue}."), walk("Evening"), bar("A drink to end at {venue}.")],
+        ])
       : b === "comfortable"
-        ? [
-            bar("Open the evening with drinks at {venue}."),
-            restaurant(),
-            walk("After-dinner", "late"),
-          ]
-        : [
-            bar("Open the evening with drinks at {venue}."),
-            restaurant(),
-            walk("After-dinner", "late"),
-            dessert(),
-          ],
-  night: (b) =>
+        ? pick(v, [
+            [bar("Open the evening with drinks at {venue}."), restaurant(), walk("After-dinner", "late")],
+            [restaurant(), walk("After-dinner", "opener"), dessert()],
+            [activity(), restaurant(), bar("A nightcap at {venue}.")],
+          ])
+        : pick(v, [
+            [bar("Open the evening with drinks at {venue}."), restaurant(), walk("After-dinner", "late"), dessert()],
+            [activity(), restaurant(), walk("After-dinner"), bar("A nightcap at {venue}.")],
+            [restaurant(), bar("Drinks after dinner at {venue}."), walk("Late", "late"), dessert()],
+          ]),
+  night: (b, v) =>
     b === "tight"
-      ? [bar("Meet for a drink at {venue}."), walk("Late-night", "late")]
+      ? pick(v, [
+          [bar("Meet for a drink at {venue}."), walk("Late-night", "late")],
+          [walk("Late-night", "opener"), bar("A drink at {venue}.")],
+        ])
       : b === "comfortable"
-        ? [bar("Meet for a drink at {venue}."), activity(), walk("Late-night", "late")]
-        : [bar("Meet for a drink at {venue}."), activity(), walk("Late-night", "late"), dessert()],
+        ? pick(v, [
+            [bar("Meet for a drink at {venue}."), activity(), walk("Late-night", "late")],
+            [activity(), bar("Drinks at {venue}."), walk("Late-night", "late")],
+          ])
+        : pick(v, [
+            [bar("Meet for a drink at {venue}."), activity(), walk("Late-night", "late"), dessert()],
+            [activity(), restaurant(), bar("A nightcap at {venue}."), walk("Late-night", "late")],
+          ]),
 };
 
 const CITY_TEMPLATES: Record<string, Record<TimeOfDay, StopSpec[]>> = { dresden: DRESDEN };
 
-// The full arc for a city+time+budget (before the engine truncates to a
-// realistic stop count). Dresden ignores budget (its scenes are the showcase).
-export function arcFor(city: string, timeOfDay: TimeOfDay, budget: Budget): StopSpec[] {
+// The full arc for a city+time+budget (before the engine truncates to a realistic
+// stop count). Curated cities keep their hand-made showcase arc; every other city
+// rotates through arc variants by `variant` so the shape genuinely changes.
+export function arcFor(
+  city: string,
+  timeOfDay: TimeOfDay,
+  budget: Budget,
+  variant = 0,
+): StopSpec[] {
   const key = city.trim().toLowerCase();
   const curated = CITY_TEMPLATES[key];
-  return curated ? curated[timeOfDay] : GENERIC[timeOfDay](budget);
+  return curated ? curated[timeOfDay] : GENERIC[timeOfDay](budget, variant);
 }
 
 export function hasCuratedTemplate(city: string): boolean {
