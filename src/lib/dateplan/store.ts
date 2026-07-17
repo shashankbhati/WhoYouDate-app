@@ -144,10 +144,11 @@ export function getCities(): PlanCity[] {
 export async function ensureCityVenues(city: string): Promise<void> {
   if (typeof window === "undefined") return;
   const key = city.trim().toLowerCase();
-  await loadCities();
-  const isAuto = _cities.some((c) => c.enabled && c.city.toLowerCase() === key);
-  if (!isAuto) return;
+  if (!key) return;
+  // Already have real (non-seed) venues for this city → nothing to fetch.
   if (_venues.some((v) => v.city.toLowerCase() === key && !v.seed)) return;
+  // Ask the importer for ANY city — the server geocodes + auto-whitelists new
+  // ones, so new locations get real venues instead of falling back to seeds.
   try {
     const res = await fetch(`/api/venues?city=${encodeURIComponent(city)}`);
     if (!res.ok) return;
